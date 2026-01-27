@@ -34,8 +34,8 @@ CLAWDBOT_PATH=$(npm root -g)/clawdbot/dist/index.js
 if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
   echo "Starting Clawdbot with Litestream replication..."
   exec litestream replicate -config /etc/litestream.yml \
-    -exec "node $CLAWDBOT_PATH gateway run"
+    -exec "node $CLAWDBOT_PATH gateway run --allow-unconfigured --bind 0.0.0.0 --port ${PORT:-8080}"
 else
   echo "Starting Clawdbot (ephemeral mode - no persistence)..."
-  exec node "$CLAWDBOT_PATH" gateway run
+  exec node "$CLAWDBOT_PATH" gateway run --allow-unconfigured --bind 0.0.0.0 --port "${PORT:-8080}"
 fi
