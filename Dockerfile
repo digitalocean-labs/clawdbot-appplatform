@@ -1,10 +1,12 @@
 FROM node:22-slim
 
-# Install Litestream for SQLite backup/restore
-RUN apt-get update && apt-get install -y wget ca-certificates \
-    && wget https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.deb \
-    && dpkg -i litestream-v0.3.13-linux-amd64.deb \
-    && rm litestream-v0.3.13-linux-amd64.deb \
+# Install Litestream for SQLite backup/restore (multi-arch)
+ARG TARGETARCH
+RUN apt-get update && apt-get install -y wget ca-certificates git \
+    && LITESTREAM_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "amd64") \
+    && wget https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-${LITESTREAM_ARCH}.deb \
+    && dpkg -i litestream-v0.3.13-linux-${LITESTREAM_ARCH}.deb \
+    && rm litestream-v0.3.13-linux-${LITESTREAM_ARCH}.deb \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Clawdbot globally
