@@ -1,0 +1,48 @@
+name: clawdbot
+region: tor  # Toronto (default)
+# Available regions: nyc, ams, sfo, sgp, lon, fra, blr, syd, tor
+
+services:
+  - name: clawdbot
+    image:
+      registry_type: GHCR
+      registry: digitalocean-labs
+      repository: clawdbot-appplatform
+      tag: latest
+    instance_count: 1
+    instance_size_slug: basic-xs  # 1 vCPU, 1GB RAM, ~$10/mo
+    http_port: 8080
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 60
+      period_seconds: 10
+    envs:
+      # Required
+      - key: PORT
+        value: "8080"
+      - key: SETUP_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+      - key: CLAWDBOT_STATE_DIR
+        value: /data/.clawdbot
+      - key: CLAWDBOT_WORKSPACE_DIR
+        value: /data/workspace
+      # Recommended
+      - key: CLAWDBOT_GATEWAY_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+      # Optional: Litestream + Spaces persistence
+      # Uncomment these to enable SQLite backup to DO Spaces
+      # - key: LITESTREAM_ACCESS_KEY_ID
+      #   scope: RUN_TIME
+      #   type: SECRET
+      # - key: LITESTREAM_SECRET_ACCESS_KEY
+      #   scope: RUN_TIME
+      #   type: SECRET
+      # - key: SPACES_ENDPOINT
+      #   scope: RUN_TIME
+      #   type: SECRET
+      #   # e.g., tor1.digitaloceanspaces.com
+      # - key: SPACES_BUCKET
+      #   scope: RUN_TIME
+      #   type: SECRET

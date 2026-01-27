@@ -1,0 +1,30 @@
+spec:
+  name: clawdbot
+  region: tor
+  services:
+    - name: clawdbot
+      image:
+        registry_type: GHCR
+        registry: digitalocean-labs
+        repository: clawdbot-appplatform
+        tag: latest
+      instance_count: 1
+      instance_size_slug: basic-xs
+      http_port: 8080
+      health_check:
+        http_path: /health
+        initial_delay_seconds: 60
+        period_seconds: 10
+      envs:
+        - key: PORT
+          value: "8080"
+        - key: SETUP_PASSWORD
+          scope: RUN_TIME
+          type: SECRET
+        - key: CLAWDBOT_STATE_DIR
+          value: /data/.clawdbot
+        - key: CLAWDBOT_WORKSPACE_DIR
+          value: /data/workspace
+        - key: CLAWDBOT_GATEWAY_TOKEN
+          scope: RUN_TIME
+          type: SECRET

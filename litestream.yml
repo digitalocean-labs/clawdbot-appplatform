@@ -1,0 +1,10 @@
+dbs:
+  - path: ${CLAWDBOT_STATE_DIR}/memory.db
+    replicas:
+      - type: s3
+        endpoint: ${SPACES_ENDPOINT}
+        bucket: ${SPACES_BUCKET}
+        path: clawdbot
+        access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+        secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
+        sync-interval: 1s
