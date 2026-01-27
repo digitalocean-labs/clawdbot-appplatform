@@ -20,23 +20,16 @@ if [ -z "$CLAWDBOT_GATEWAY_TOKEN" ]; then
   echo "Generated gateway token (ephemeral)"
 fi
 
-# Configure gateway for container deployment via environment
-export CLAWDBOT_GATEWAY_MODE=local
-export CLAWDBOT_GATEWAY_BIND=lan
-export CLAWDBOT_GATEWAY_PORT="${PORT:-8080}"
-
-echo "Gateway config: mode=$CLAWDBOT_GATEWAY_MODE bind=$CLAWDBOT_GATEWAY_BIND port=$CLAWDBOT_GATEWAY_PORT"
-
-# Get the global node_modules path
-CLAWDBOT_PATH=$(npm root -g)/clawdbot/dist/index.js
+PORT="${PORT:-8080}"
+echo "Starting gateway: port=$PORT bind=lan"
 
 # Start with or without Litestream replication
-# Note: --bind lan requires a token for auth
+# Use same command format as fly.toml: gateway --allow-unconfigured --port X --bind lan
 if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
-  echo "Starting Clawdbot with Litestream replication..."
+  echo "Mode: Litestream replication enabled"
   exec litestream replicate -config /etc/litestream.yml \
-    -exec "node $CLAWDBOT_PATH gateway run --allow-unconfigured --bind lan --port ${PORT:-8080} --token $CLAWDBOT_GATEWAY_TOKEN"
+    -exec "clawdbot gateway --allow-unconfigured --port $PORT --bind lan --token $CLAWDBOT_GATEWAY_TOKEN"
 else
-  echo "Starting Clawdbot (ephemeral mode - no persistence)..."
-  exec node "$CLAWDBOT_PATH" gateway run --allow-unconfigured --bind lan --port "${PORT:-8080}" --token "$CLAWDBOT_GATEWAY_TOKEN"
+  echo "Mode: ephemeral (no persistence)"
+  exec clawdbot gateway --allow-unconfigured --port "$PORT" --bind lan --token "$CLAWDBOT_GATEWAY_TOKEN"
 fi
