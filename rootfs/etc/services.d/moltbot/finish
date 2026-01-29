@@ -1,6 +1,24 @@
 #!/command/with-contenv bash
-# Graceful shutdown - save state before exit
+# Graceful shutdown - save state before exit using s3cmd sync
+
+# Skip if persistence not configured
+if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
+  exit 0
+fi
 
 echo "[moltbot] Service stopping, saving state..."
-/usr/local/bin/moltbot-backup
-echo "[moltbot] Shutdown complete"
+
+S3_PREFIX="s3://${SPACES_BUCKET}/moltbot/rootfs"
+
+s3cmd -c /tmp/.s3cfg sync --delete-removed --no-preserve \
+  --exclude="memory/*" --exclude="*.sqlite*" --exclude="*.db*" --exclude="gateway.*.lock" \
+  "$MOLTBOT_STATE_DIR/" "${S3_PREFIX}/data/.moltbot/" || true
+
+s3cmd -c /tmp/.s3cfg sync --delete-removed --no-preserve \
+  "$TS_STATE_DIR/" "${S3_PREFIX}/data/tailscale/" || true
+
+s3cmd -c /tmp/.s3cfg sync --delete-removed --no-preserve \
+  --exclude="*/.cache/*" --exclude="*/.npm/_cacache/*" --exclude="*/.local/share/pnpm/store/*" --exclude="*/node_modules/*" \
+  "/home/" "${S3_PREFIX}/home/" || true
+
+echo "[moltbot] State saved"
