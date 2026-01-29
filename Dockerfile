@@ -1,79 +1,76 @@
-FROM node:24-slim AS builder
+FROM tailscale/tailscale:stable AS tailscale
 
-# Install pnpm and build dependencies
-RUN npm install -g pnpm@10
 
-WORKDIR /build
-
-# Clone and build Clawdbot from source
-ARG CLAWDBOT_REPO=https://github.com/clawdbot/clawdbot.git
-ARG CLAWDBOT_REF=main
-
-ENV CI=true
-
-RUN apt-get update && apt-get install -y git && \
-    git clone --depth 1 --branch ${CLAWDBOT_REF} ${CLAWDBOT_REPO} . && \
-    pnpm install --frozen-lockfile && \
-    pnpm build && \
-    pnpm ui:build && \
-    pnpm prune --prod
-
-# --- Final image ---
 FROM node:24-slim
 
-ARG TARGETARCH
+COPY --from=tailscale /usr/local/bin/tailscale /usr/local/bin/real_tailscale
+COPY --from=tailscale /usr/local/bin/tailscaled /usr/local/bin/tailscaled
+COPY --from=tailscale /usr/local/bin/containerboot /usr/local/bin/containerboot
+
+COPY tailscale /usr/local/bin/tailscale
+
+ARG TARGETARCH=x86_64
+ARG CLAWDBOT_VERSION=latest
 ARG LITESTREAM_VERSION=0.5.6
 
-ENV PORT=8080 \
-    CLAWDBOT_STATE_DIR=/data/.clawdbot \
+ENV CLAWDBOT_STATE_DIR=/data/.clawdbot \
     CLAWDBOT_WORKSPACE_DIR=/data/workspace \
     NODE_ENV=production
 
 # Install OS deps + Litestream + s3cmd for state backup
+# Note: Litestream 0.5.x uses x86_64 (not amd64) and no 'v' prefix in filename
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-        ca-certificates \
-        wget \
-        curl \
-        openssl \
-        git \
-        s3cmd \
-        python3; \
+    ca-certificates \
+    wget \
+    vim \
+    jq \
+    curl \
+    openssl \
+    sudo \
+    procps \
+    build-essential \
+    git \
+    s3cmd \
+    python3; \
     LITESTREAM_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo arm64 || echo x86_64 )"; \
     wget -O /tmp/litestream.deb \
-      https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-${LITESTREAM_ARCH}.deb; \
+    https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-${LITESTREAM_ARCH}.deb; \
     dpkg -i /tmp/litestream.deb; \
     rm /tmp/litestream.deb; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*
 
-# Copy built Clawdbot from builder (only what's needed)
-COPY --from=builder /build/dist /usr/local/lib/clawdbot/dist
-COPY --from=builder /build/node_modules /usr/local/lib/clawdbot/node_modules
-COPY --from=builder /build/package.json /usr/local/lib/clawdbot/package.json
-COPY --from=builder /build/extensions /usr/local/lib/clawdbot/extensions
-COPY --from=builder /build/skills /usr/local/lib/clawdbot/skills
-
-# Create clawdbot executable wrapper
-RUN echo '#!/bin/sh' > /usr/local/bin/clawdbot && \
-    echo 'exec node /usr/local/lib/clawdbot/dist/entry.js "$@"' >> /usr/local/bin/clawdbot && \
-    chmod +x /usr/local/bin/clawdbot
-
-# Create non-root user with home directory
-RUN useradd -r -u 10001 -m -d /home/clawdbot clawdbot \
-    && mkdir -p /data/.clawdbot /data/workspace \
-    && chown -R clawdbot:clawdbot /data /home/clawdbot
-
-# Copy default config with App Platform settings (moltbot.json is the actual config file name)
-COPY moltbot.default.json /data/.clawdbot/moltbot.default.json
-RUN chown clawdbot:clawdbot /data/.clawdbot/moltbot.default.json
-
 COPY entrypoint.sh /entrypoint.sh
 COPY litestream.yml /etc/litestream.yml
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 8080
+# Create non-root user with home directory, add to sudoers (NOPASSWD)
+RUN useradd -r -m -d /home/clawdbot clawdbot \
+    && mkdir -p "${CLAWDBOT_STATE_DIR}" && mkdir -p "${CLAWDBOT_WORKSPACE_DIR}" \
+    && chown -R clawdbot:clawdbot /data "${CLAWDBOT_STATE_DIR}" "${CLAWDBOT_WORKSPACE_DIR}" \
+    && echo 'clawdbot ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/clawdbot \
+    && chmod 440 /etc/sudoers.d/clawdbot
 
+
+
+# Add Homebrew and pnpm to PATH
+ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
+ENV PNPM_HOME="/home/clawdbot/.local/share/pnpm"
+ENV PATH="${PNPM_HOME}:${PATH}"
+
+# Create pnpm global bin directory with correct ownership
+RUN mkdir -p ${PNPM_HOME} && chown -R clawdbot:clawdbot /home/clawdbot/.local
+
+# Switch to clawdbot for Homebrew install (must run as non-root)
 USER clawdbot
+
+# Install Homebrew
+RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install pnpm via Homebrew and clawdbot globally
+RUN NONINTERACTIVE=1 brew install pnpm \
+    && pnpm add -g "clawdbot@${CLAWDBOT_VERSION}" 
+
 ENTRYPOINT ["/entrypoint.sh"]

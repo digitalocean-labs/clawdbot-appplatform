@@ -1,9 +1,0 @@
-{
-  "gateway": {
-    "mode": "local",
-    "trustedProxies": ["0.0.0.0/0", "::/0"],
-    "controlUi": {
-      "allowInsecureAuth": true
-    }
-  }
-}

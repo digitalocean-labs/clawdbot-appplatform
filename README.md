@@ -6,9 +6,8 @@ Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/claw
 
 ## Features
 
-- **Fast boot** (~30 seconds)
-- **Built from source** with latest features (device auth bypass, Gradient AI)
-- **Pre-configured** for App Platform (trusted proxies, Control UI access)
+- **Fast boot** (~30 seconds vs 5-10 min source build)
+- **Auto-update** on every container start
 - **Optional persistence** via Litestream + DO Spaces
 - **Multi-arch** support (amd64/arm64)
 
@@ -45,14 +44,6 @@ Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/claw
 | Variable | Description |
 |----------|-------------|
 | `CLAWDBOT_GATEWAY_TOKEN` | Admin token for gateway API access |
-
-### Optional (Model Provider)
-
-| Variable | Description |
-|----------|-------------|
-| `GRADIENT_API_KEY` | DigitalOcean Gradient AI Model Access Key for serverless inference |
-
-See [Gradient AI Setup](#gradient-ai-setup) for configuration details.
 
 ### Optional (Persistence)
 
@@ -149,67 +140,10 @@ During operation:
 - JSON state is backed up every 5 minutes
 - On graceful shutdown (SIGTERM), final state backup is saved
 
-## Control UI Access
-
-The image comes pre-configured with password authentication mode and `trustedProxies: ["0.0.0.0/0"]`. This is necessary because App Platform runs behind Cloudflare's reverse proxy.
-
-Access the Control UI at:
-```
-https://<your-app>.ondigitalocean.app/
-```
-
-You'll be prompted to enter your `SETUP_PASSWORD` to authenticate.
-
-> **Security Note:** The password is your `SETUP_PASSWORD` environment variable. Keep it secret. HTTPS is provided by App Platform via Cloudflare.
-
-## Gradient AI Setup
-
-[DigitalOcean Gradient](https://www.digitalocean.com/products/gradient) provides serverless AI inference with models like Llama 3.3, Claude, and GPT-4o. To use Gradient as your model provider:
-
-### 1. Create a Model Access Key
-
-1. Go to [Gradient Serverless Inference](https://cloud.digitalocean.com/gen-ai/serverless-inference)
-2. Click **Create model access key**
-3. Name it (e.g., `clawdbot`) and save the secret key
-
-Or via API:
-```bash
-curl -X POST "https://api.digitalocean.com/v2/gen-ai/models/api_keys" \
-  -H "Authorization: Bearer $DIGITALOCEAN_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "clawdbot"}'
-```
-
-### 2. Add Environment Variable
-
-Add `GRADIENT_API_KEY` to your App Platform app (as a secret).
-
-### 3. Done
-
-The image comes pre-configured for Gradient AI with `llama3.3-70b-instruct` as the default model. No additional configuration needed.
-
-The default config (`clawdbot.default.json`) includes:
-- Gradient provider at `https://inference.do-ai.run/v1`
-- API key via `${GRADIENT_API_KEY}` environment variable
-- Default model: `gradient/llama3.3-70b-instruct`
-
-### Available Models
-
-| Model ID | Description |
-|----------|-------------|
-| `llama3.3-70b-instruct` | Meta Llama 3.3 70B (general purpose) |
-| `llama3-8b-instruct` | Meta Llama 3 8B (faster, lower cost) |
-| `anthropic-claude-opus-4` | Claude Opus 4 |
-| `anthropic-claude-sonnet-4` | Claude Sonnet 4 |
-| `openai-gpt-4o` | GPT-4o |
-
-Run `doctl genai list-models` or check the [Gradient dashboard](https://cloud.digitalocean.com/gen-ai/serverless-inference) for the full list.
-
 ## Documentation
 
 - [Full deployment guide](https://docs.clawd.bot/digitalocean)
 - [Clawdbot documentation](https://docs.clawd.bot)
-- [Gradient AI documentation](https://docs.digitalocean.com/products/gradient-ai-platform/)
 
 ## License
 

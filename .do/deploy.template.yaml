@@ -1,30 +1,63 @@
 spec:
+  alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+  features:
+  - buildpack-stack=ubuntu-22
+  ingress: {}
   name: clawdbot
-  region: tor
-  services:
-    - name: clawdbot
-      image:
-        registry_type: GHCR
-        registry: bikramkgupta
-        repository: clawdbot-appplatform
-        tag: latest
-      instance_count: 1
-      instance_size_slug: apps-s-1vcpu-2gb
-      http_port: 8080
-      health_check:
-        http_path: /health
-        initial_delay_seconds: 60
-        period_seconds: 10
-      envs:
-        - key: PORT
-          value: "8080"
-        - key: SETUP_PASSWORD
-          scope: RUN_TIME
-          type: SECRET
-        - key: CLAWDBOT_STATE_DIR
-          value: /data/.clawdbot
-        - key: CLAWDBOT_WORKSPACE_DIR
-          value: /data/workspace
-        - key: CLAWDBOT_GATEWAY_TOKEN
-          scope: RUN_TIME
-          type: SECRET
+  region: atl
+  workers:
+  - dockerfile_path: /Dockerfile
+    envs:
+    - key: SETUP_PASSWORD
+      scope: RUN_TIME
+      type: SECRET
+      value: elan
+    - key: CLAWDBOT_STATE_DIR
+      scope: RUN_AND_BUILD_TIME
+      value: /data/.clawdbot
+    - key: CLAWDBOT_WORKSPACE_DIR
+      scope: RUN_AND_BUILD_TIME
+      value: /data/workspace
+    - key: SPACES_ENDPOINT
+      scope: RUN_AND_BUILD_TIME
+      value: atl1.digitaloceanspaces.com
+    - key: XXXSPACES_BUCKET
+      scope: RUN_AND_BUILD_TIME
+      value: clawdbot
+    - key: LITESTREAM_SECRET_ACCESS_KEY
+      scope: RUN_AND_BUILD_TIME
+      type: SECRET
+      value: xxx
+    - key: LITESTREAM_ACCESS_KEY_ID
+      scope: RUN_AND_BUILD_TIME
+      type: SECRET
+      value: xxx
+    - key: TS_ENABLE_HEALTH_CHECK
+      scope: RUN_AND_BUILD_TIME
+      value: "true"
+    - key: TS_LOCAL_ADDR_PORT
+      scope: RUN_AND_BUILD_TIME
+      value: '[::]:9002'
+    - key: TS_AUTHKEY
+      scope: RUN_TIME
+      type: SECRET
+      value: xxx
+    - key: TS_USERSPACE
+      scope: RUN_AND_BUILD_TIME
+      value: "true"
+    - key: TS_HOSTNAME
+      scope: RUN_AND_BUILD_TIME
+      value: clawdbot
+    - key: TS_SOCKET
+      scope: RUN_AND_BUILD_TIME
+      value: /tmp/tailscaled.sock
+    github:
+      branch: elan
+      deploy_on_push: true
+      repo: ElanHasson/clawdbot-appplatform
+    instance_count: 1
+    instance_size_slug: apps-s-2vcpu-4gb
+    name: clawdbot
+    source_dir: /

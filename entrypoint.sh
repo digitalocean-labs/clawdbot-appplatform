@@ -16,6 +16,31 @@ use_https = True
 EOF
 }
 
+# Function to replace a node in JSON file using jq
+replaceConfigNode() {
+  local jq_path="$1"
+  local json_fragment="$2"
+  local config_file="${3:-config.json}"
+
+  if [[ -z "$jq_path" || -z "$json_fragment" ]]; then
+    echo "Usage: replaceConfigNode <jq_path> <json_fragment> [config_file]" >&2
+    return 1
+  fi
+
+  local tmp
+  tmp="$(mktemp)"
+
+  jq \
+    --argjson value "$json_fragment" \
+    "$jq_path = \$value" \
+    "$config_file" > "$tmp" || {
+      rm -f "$tmp"
+      return 1
+    }
+
+  mv "$tmp" "$config_file"
+}
+
 # Restore from Spaces backup if configured
 if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
   echo "Restoring state from Spaces backup..."
@@ -42,113 +67,37 @@ fi
 # Show version (image is rebuilt weekly with latest clawdbot)
 echo "Clawdbot version: $(clawdbot --version 2>/dev/null || echo 'unknown')"
 
-# Determine auth mode: password auth if SETUP_PASSWORD is set, otherwise token auth
-if [ -n "$SETUP_PASSWORD" ]; then
-  AUTH_MODE="password"
-  AUTH_ARGS="--auth password --password \"\$SETUP_PASSWORD\""
-  echo "Auth mode: password"
-else
-  # Generate a gateway token if not provided (required for LAN binding with token auth)
-  if [ -z "$CLAWDBOT_GATEWAY_TOKEN" ]; then
-    export CLAWDBOT_GATEWAY_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -d '=/+' | head -c 32)
-    echo "Generated gateway token (ephemeral)"
-  fi
-  AUTH_MODE="token"
-  AUTH_ARGS="--token \"\$CLAWDBOT_GATEWAY_TOKEN\""
-  echo "Auth mode: token"
+# Generate a gateway token if not provided (required for LAN binding)
+if [ -z "$CLAWDBOT_GATEWAY_TOKEN" ]; then
+  export CLAWDBOT_GATEWAY_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -d '=/+' | head -c 32)
+  echo "Generated gateway token (ephemeral)"
 fi
 
 # Create config file for cloud deployment
-# Dynamically generates config with Gradient provider if GRADIENT_API_KEY is set
-# Note: Clawdbot uses moltbot.json as its config file name
-CONFIG_FILE="$CLAWDBOT_STATE_DIR/moltbot.json"
-DEFAULT_CONFIG="/data/.clawdbot/moltbot.default.json"
-
-# Always regenerate config to avoid stale env var references from backups
-echo "Creating config: $CONFIG_FILE"
-
-# Start with base config from default file or create minimal one
-  if [ -f "$DEFAULT_CONFIG" ]; then
-    # Read default config but remove closing brace (we'll add it back after optional sections)
-    sed '$ s/}$//' "$DEFAULT_CONFIG" > "$CONFIG_FILE"
-  else
-    # Minimal base config (without closing brace)
-    cat > "$CONFIG_FILE" << 'CONFIGEOF'
+# Note: Control UI device auth bypass requires clawdbot >= 2026.1.25
+CONFIG_FILE="$CLAWDBOT_STATE_DIR/clawdbot.json"
+if [ ! -f "$CONFIG_FILE" ]; then
+  echo "Creating initial config: $CONFIG_FILE"
+  cat > "$CONFIG_FILE" << 'CONFIGEOF'
 {
   "gateway": {
+    "trustedProxies": [],
     "mode": "local",
-    "trustedProxies": ["0.0.0.0/0", "::/0"],
+    "bind": "loopback",
+    "tailscale": { "mode": "serve" },
+    "auth": {
+      "allowTailscale": true
+    },
     "controlUi": {
       "allowInsecureAuth": true
     }
   }
+}
 CONFIGEOF
-  fi
+fi
 
-  # Conditionally add Gradient provider if API key is set
-  if [ -n "$GRADIENT_API_KEY" ]; then
-    echo "Adding Gradient provider to config"
-    cat >> "$CONFIG_FILE" << GRADIENTEOF
-,
-  "models": {
-    "mode": "merge",
-    "providers": {
-      "gradient": {
-        "baseUrl": "https://inference.do-ai.run/v1",
-        "apiKey": "$GRADIENT_API_KEY",
-        "api": "openai-completions",
-        "models": [
-          {
-            "id": "llama3.3-70b-instruct",
-            "name": "Llama 3.3 70B Instruct",
-            "reasoning": false,
-            "input": ["text"],
-            "contextWindow": 128000,
-            "maxTokens": 8192
-          },
-          {
-            "id": "anthropic-claude-4.5-sonnet",
-            "name": "Claude 4.5 Sonnet",
-            "reasoning": false,
-            "input": ["text"],
-            "contextWindow": 200000,
-            "maxTokens": 8192
-          },
-          {
-            "id": "anthropic-claude-opus-4.5",
-            "name": "Claude Opus 4.5",
-            "reasoning": true,
-            "input": ["text"],
-            "contextWindow": 200000,
-            "maxTokens": 16384
-          },
-          {
-            "id": "deepseek-r1-distill-llama-70b",
-            "name": "DeepSeek R1 Distill Llama 70B",
-            "reasoning": true,
-            "input": ["text"],
-            "contextWindow": 128000,
-            "maxTokens": 8192
-          }
-        ]
-      }
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "gradient/llama3.3-70b-instruct"
-      }
-    }
-  }
-GRADIENTEOF
-  fi
 
-# Close the JSON object
-echo "}" >> "$CONFIG_FILE"
-
-PORT="${PORT:-8080}"
-echo "Starting gateway: port=$PORT bind=lan"
+echo "Starting gateway: bind=tailnet" # https://docs.molt.bot/gateway/tailscale#tailscale-prerequisites-+-limits
 
 # Backup function for JSON state files
 backup_state() {
@@ -190,8 +139,11 @@ shutdown_handler() {
 }
 trap shutdown_handler SIGTERM SIGINT
 
+echo "Starting Tailscale daemon..."
+# Start tailscaled in the background
+/usr/local/bin/containerboot &
+
 # Start with or without Litestream replication
-# Use same command format as fly.toml: gateway --allow-unconfigured --port X --bind lan
 if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
   echo "Mode: Litestream + state backup enabled"
 
@@ -199,23 +151,13 @@ if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
   start_backup_loop &
 
   # Run gateway with Litestream for SQLite replication
-  # Use eval to properly expand AUTH_ARGS which contains quoted variables
-  if [ "$AUTH_MODE" = "password" ]; then
-    litestream replicate -config /etc/litestream.yml \
-      -exec "clawdbot gateway --allow-unconfigured --port $PORT --bind lan --auth password --password \"$SETUP_PASSWORD\"" &
-  else
-    litestream replicate -config /etc/litestream.yml \
-      -exec "clawdbot gateway --allow-unconfigured --port $PORT --bind lan --token $CLAWDBOT_GATEWAY_TOKEN" &
-  fi
+  litestream replicate -config /etc/litestream.yml \
+    -exec "clawdbot gateway --allow-unconfigured --tailscale serve" &
   GATEWAY_PID=$!
 
   # Wait for gateway and handle shutdown
   wait $GATEWAY_PID
 else
   echo "Mode: ephemeral (no persistence)"
-  if [ "$AUTH_MODE" = "password" ]; then
-    exec clawdbot gateway --allow-unconfigured --port "$PORT" --bind lan --auth password --password "$SETUP_PASSWORD"
-  else
-    exec clawdbot gateway --allow-unconfigured --port "$PORT" --bind lan --token "$CLAWDBOT_GATEWAY_TOKEN"
-  fi
+  exec clawdbot gateway --allow-unconfigured --tailscale serve
 fi

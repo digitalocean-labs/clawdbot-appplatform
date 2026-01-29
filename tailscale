@@ -1,0 +1,31 @@
+#!/bin/bash
+set -e
+
+# Proxy entire command line to real_tailscale and add the socket path from TS_SOCKET if not already present
+
+
+
+ARGS=("$@")
+
+# Check if any argument starts with --socket=
+SOCKET_PRESENT=false
+for arg in "${ARGS[@]}"; do
+	case $arg in
+		--socket=*) SOCKET_PRESENT=true ;;
+	esac
+done
+
+
+# Insert --socket as the first argument if not present
+if [ "$SOCKET_PRESENT" = false ]; then
+	SOCKET_ARG="--socket=${TS_SOCKET:-/tmp/tailscale.sock}"
+	ARGS=("$SOCKET_ARG" "${ARGS[@]}")
+fi
+
+
+# echo "Executing: $0"
+# for arg in "${ARGS[@]}"; do
+# 	echo "arg: $arg"
+# done
+
+exec "$(dirname "$0")/real_tailscale" "${ARGS[@]}"
