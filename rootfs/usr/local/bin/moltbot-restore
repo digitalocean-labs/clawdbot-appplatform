@@ -1,5 +1,5 @@
 #!/command/with-contenv bash
-# Unified restore script for moltbot state
+# Unified restore script for moltbot state using s3cmd sync
 # Usage:
 #   moltbot-restore                   # Restore all default paths
 #   moltbot-restore --path /some/dir  # Restore specific path
@@ -56,28 +56,31 @@ EOF
   fi
 }
 
-# Restore a single path
-# Args: $1 = target path, $2 = s3 key name
+# Restore a single path using s3cmd sync
+# Args: $1 = target path, $2 = s3 key prefix
 restore_path() {
   local target_path="$1"
-  local key_name="$2"
-  local s3_path="s3://${SPACES_BUCKET}/moltbot/${key_name}.tar.gz"
+  local key_prefix="$2"
+  local s3_path="s3://${SPACES_BUCKET}/moltbot/${key_prefix}/"
   
   # Ensure target directory exists
   mkdir -p "$target_path"
   
-  if s3cmd -c /tmp/.s3cfg ls "$s3_path" 2>/dev/null | grep -q "${key_name}"; then
-    log "Downloading ${key_name}.tar.gz to $target_path..."
-    s3cmd -c /tmp/.s3cfg get "$s3_path" "/tmp/${key_name}.tar.gz" && \
-      tar -xzf "/tmp/${key_name}.tar.gz" -C "$target_path" || \
-      log "Warning: failed to restore $target_path (continuing)"
-    rm -f "/tmp/${key_name}.tar.gz"
+  # Check if backup exists in S3
+  if s3cmd -c /tmp/.s3cfg ls "$s3_path" 2>/dev/null | grep -q .; then
+    log "Syncing $s3_path to $target_path..."
+    # Note: not using --delete-removed on restore to preserve any local files
+    s3cmd -c /tmp/.s3cfg sync \
+      --no-preserve \
+      "$s3_path" "${target_path}/" && \
+      log "$target_path restored successfully" || \
+      log "Warning: $target_path restore failed (continuing)"
   else
     log "No backup found for $target_path (first deployment)"
   fi
 }
 
-# Generate key name from path (e.g., /home/moltbot -> home-moltbot-backup)
+# Generate key prefix from path (e.g., /home/moltbot -> home-moltbot)
 path_to_key() {
   local path="$1"
   # Remove leading slash, replace remaining slashes with dashes
@@ -96,8 +99,8 @@ ensure_s3cfg
 
 # If custom path specified, restore just that
 if [ -n "$CUSTOM_PATH" ]; then
-  key_name="$(path_to_key "$CUSTOM_PATH")-backup"
-  restore_path "$CUSTOM_PATH" "$key_name"
+  key_prefix="$(path_to_key "$CUSTOM_PATH")"
+  restore_path "$CUSTOM_PATH" "$key_prefix"
   log "Restore complete"
   exit 0
 fi
@@ -106,9 +109,9 @@ fi
 # Ensure base directories exist
 mkdir -p "$MOLTBOT_STATE_DIR" "$MOLTBOT_WORKSPACE_DIR" "$TS_STATE_DIR"
 
-restore_path "$MOLTBOT_STATE_DIR" "state-backup"
-restore_path "$TS_STATE_DIR" "tailscale-state"
-restore_path "/home" "home-backup"
+restore_path "$MOLTBOT_STATE_DIR" "state"
+restore_path "$TS_STATE_DIR" "tailscale"
+restore_path "/home" "home"
 restore_sqlite
 
 log "Restore complete"

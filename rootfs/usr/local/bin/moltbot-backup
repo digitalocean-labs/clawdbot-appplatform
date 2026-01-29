@@ -1,5 +1,5 @@
 #!/command/with-contenv bash
-# Unified backup script for moltbot state
+# Unified backup script for moltbot state using s3cmd sync
 # Usage: 
 #   moltbot-backup                    # Backup all default paths
 #   moltbot-backup --path /some/dir   # Backup specific path
@@ -61,11 +61,11 @@ EOF
   fi
 }
 
-# Backup a single path
-# Args: $1 = source path, $2 = s3 key name, $3 = extra exclude args (optional)
+# Backup a single path using s3cmd sync
+# Args: $1 = source path, $2 = s3 key prefix, $3 = extra exclude args (optional)
 backup_path() {
   local src_path="$1"
-  local key_name="$2"
+  local key_prefix="$2"
   local extra_excludes="${3:-}"
   
   if [ ! -d "$src_path" ]; then
@@ -73,26 +73,22 @@ backup_path() {
     return 0
   fi
   
-  log "Backing up $src_path..."
-  cd "$src_path"
+  log "Syncing $src_path to s3://${SPACES_BUCKET}/moltbot/${key_prefix}/..."
   
-  # Build tar command
-  tar -czf "/tmp/${key_name}.tar.gz" \
+  # Build s3cmd sync command
+  # --delete-removed: remove files from S3 that no longer exist locally
+  # --no-preserve: don't try to preserve permissions (not supported by S3)
+  s3cmd -c /tmp/.s3cfg sync \
+    --delete-removed \
+    --no-preserve \
     $extra_excludes \
     $EXCLUDE_ARGS \
-    --ignore-failed-read \
-    . 2>/dev/null || true
-
-  if [ -f "/tmp/${key_name}.tar.gz" ]; then
-    s3cmd -c /tmp/.s3cfg put "/tmp/${key_name}.tar.gz" \
-      "s3://${SPACES_BUCKET}/moltbot/${key_name}.tar.gz" && \
-      log "$src_path uploaded as ${key_name}.tar.gz" || \
-      log "Warning: $src_path upload failed"
-    rm -f "/tmp/${key_name}.tar.gz"
-  fi
+    "${src_path}/" "s3://${SPACES_BUCKET}/moltbot/${key_prefix}/" && \
+    log "$src_path synced successfully" || \
+    log "Warning: $src_path sync failed"
 }
 
-# Generate key name from path (e.g., /home/moltbot -> home-moltbot-backup)
+# Generate key prefix from path (e.g., /home/moltbot -> home-moltbot)
 path_to_key() {
   local path="$1"
   # Remove leading slash, replace remaining slashes with dashes
@@ -103,15 +99,15 @@ ensure_s3cfg
 
 # If custom path specified, backup just that
 if [ -n "$CUSTOM_PATH" ]; then
-  key_name="$(path_to_key "$CUSTOM_PATH")-backup"
-  backup_path "$CUSTOM_PATH" "$key_name"
+  key_prefix="$(path_to_key "$CUSTOM_PATH")"
+  backup_path "$CUSTOM_PATH" "$key_prefix"
   log "Backup complete"
   exit 0
 fi
 
 # Default: backup all known paths
-backup_path "$MOLTBOT_STATE_DIR" "state-backup" "--exclude=memory --exclude=*.sqlite* --exclude=*.db* --exclude=gateway.*.lock"
-backup_path "$TS_STATE_DIR" "tailscale-state"
-backup_path "/home" "home-backup" "--exclude=*/.cache --exclude=*/.npm/_cacache --exclude=*/.local/share/pnpm/store --exclude=*/node_modules"
+backup_path "$MOLTBOT_STATE_DIR" "state" "--exclude=memory/* --exclude=*.sqlite* --exclude=*.db* --exclude=gateway.*.lock"
+backup_path "$TS_STATE_DIR" "tailscale"
+backup_path "/home" "home" "--exclude=*/.cache/* --exclude=*/.npm/_cacache/* --exclude=*/.local/share/pnpm/store/* --exclude=*/node_modules/*"
 
 log "Backup complete"
