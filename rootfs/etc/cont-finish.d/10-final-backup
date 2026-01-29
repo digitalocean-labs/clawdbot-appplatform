@@ -12,18 +12,18 @@ S3_PREFIX="s3://${SPACES_BUCKET}/moltbot/rootfs"
 
 # Backup moltbot state
 echo "[final-backup] Syncing moltbot state..."
-s3cmd -c /tmp/.s3cfg sync --delete-removed --no-preserve \
+s3cmd -c /run/secrets/s3cfg sync --delete-removed --no-preserve \
   --exclude="memory/*" --exclude="*.sqlite*" --exclude="*.db*" --exclude="gateway.*.lock" \
   "$MOLTBOT_STATE_DIR/" "${S3_PREFIX}/data/.moltbot/" || true
 
 # Backup Tailscale state
 echo "[final-backup] Syncing Tailscale state..."
-s3cmd -c /tmp/.s3cfg sync --delete-removed --no-preserve \
+s3cmd -c /run/secrets/s3cfg sync --delete-removed --no-preserve \
   "$TS_STATE_DIR/" "${S3_PREFIX}/data/tailscale/" || true
 
 # Backup home directories
 echo "[final-backup] Syncing home directories..."
-s3cmd -c /tmp/.s3cfg sync --delete-removed --no-preserve \
+s3cmd -c /run/secrets/s3cfg sync --delete-removed --no-preserve \
   --exclude="*/.cache/*" --exclude="*/.npm/_cacache/*" --exclude="*/.local/share/pnpm/store/*" --exclude="*/node_modules/*" \
   "/home/" "${S3_PREFIX}/home/" || true
 

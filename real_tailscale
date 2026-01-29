@@ -1,9 +1,0 @@
-#!/bin/bash
-set -e
-# This is used for local testing of the tailscale wrapper.
-
-# echo the entire command line for this script's execution w/ args
-echo "Executing: $0"
-for arg in "$@"; do
-	echo "arg: $arg"
-done

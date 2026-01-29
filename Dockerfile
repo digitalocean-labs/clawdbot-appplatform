@@ -3,10 +3,10 @@ FROM tailscale/tailscale:stable AS tailscale
 FROM ubuntu:noble
 
 # Copy Tailscale binaries
+# real_tailscale is used because the rootfs/usr/local/bin/tailscale script is a wrapper that injects the socket path for tailscale CLI
 COPY --from=tailscale /usr/local/bin/tailscale /usr/local/bin/real_tailscale
 COPY --from=tailscale /usr/local/bin/tailscaled /usr/local/bin/tailscaled
 COPY --from=tailscale /usr/local/bin/containerboot /usr/local/bin/containerboot
-COPY tailscale /usr/local/bin/tailscale
 
 ARG TARGETARCH
 ARG MOLTBOT_VERSION=latest

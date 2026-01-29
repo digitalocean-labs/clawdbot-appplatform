@@ -9,7 +9,11 @@ fi
 
 echo "[setup-s3cfg] Configuring s3cmd for DO Spaces..."
 
-cat > /tmp/.s3cfg << EOF
+# Create secure directory (root-only, in-memory tmpfs)
+mkdir -p /run/secrets
+chmod 700 /run/secrets
+
+cat > /run/secrets/s3cfg << EOF
 [default]
 access_key = ${LITESTREAM_ACCESS_KEY_ID}
 secret_key = ${LITESTREAM_SECRET_ACCESS_KEY}
@@ -17,6 +21,6 @@ host_base = ${SPACES_ENDPOINT}
 host_bucket = %(bucket)s.${SPACES_ENDPOINT}
 use_https = True
 EOF
-chmod 600 /tmp/.s3cfg
+chmod 600 /run/secrets/s3cfg
 
 echo "[setup-s3cfg] s3cmd configured"

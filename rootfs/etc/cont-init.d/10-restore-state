@@ -15,9 +15,9 @@ S3_PREFIX="s3://${SPACES_BUCKET}/moltbot/rootfs"
 mkdir -p "$MOLTBOT_STATE_DIR" "$MOLTBOT_WORKSPACE_DIR" "$TS_STATE_DIR"
 
 # Restore moltbot state
-if s3cmd -c /tmp/.s3cfg ls "${S3_PREFIX}/data/.moltbot/" 2>/dev/null | grep -q .; then
+if s3cmd -c /run/secrets/s3cfg ls "${S3_PREFIX}/data/.moltbot/" 2>/dev/null | grep -q .; then
   echo "[restore-state] Restoring moltbot state..."
-  s3cmd -c /tmp/.s3cfg sync --no-preserve \
+  s3cmd -c /run/secrets/s3cfg sync --no-preserve \
     "${S3_PREFIX}/data/.moltbot/" "$MOLTBOT_STATE_DIR/" || \
     echo "[restore-state] Warning: moltbot state restore failed"
 else
@@ -25,9 +25,9 @@ else
 fi
 
 # Restore Tailscale state
-if s3cmd -c /tmp/.s3cfg ls "${S3_PREFIX}/data/tailscale/" 2>/dev/null | grep -q .; then
+if s3cmd -c /run/secrets/s3cfg ls "${S3_PREFIX}/data/tailscale/" 2>/dev/null | grep -q .; then
   echo "[restore-state] Restoring Tailscale state..."
-  s3cmd -c /tmp/.s3cfg sync --no-preserve \
+  s3cmd -c /run/secrets/s3cfg sync --no-preserve \
     "${S3_PREFIX}/data/tailscale/" "$TS_STATE_DIR/" || \
     echo "[restore-state] Warning: Tailscale state restore failed"
 else
@@ -35,9 +35,9 @@ else
 fi
 
 # Restore home directories
-if s3cmd -c /tmp/.s3cfg ls "${S3_PREFIX}/home/" 2>/dev/null | grep -q .; then
+if s3cmd -c /run/secrets/s3cfg ls "${S3_PREFIX}/home/" 2>/dev/null | grep -q .; then
   echo "[restore-state] Restoring home directories..."
-  s3cmd -c /tmp/.s3cfg sync --no-preserve \
+  s3cmd -c /run/secrets/s3cfg sync --no-preserve \
     "${S3_PREFIX}/home/" "/home/" || \
     echo "[restore-state] Warning: home restore failed"
 else
