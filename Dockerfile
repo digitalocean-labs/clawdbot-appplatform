@@ -114,6 +114,9 @@ COPY rootfs/ /
 # Fix ownership for any files copied to moltbot's home
 RUN chown -R moltbot:moltbot /home/moltbot 2>/dev/null || true
 
+# Generate initial package selections list (for restore capability)
+RUN dpkg --get-selections > /etc/moltbot/dpkg-selections
+
 # Expose ports: 8080 for LAN mode, 22 for SSH
 EXPOSE 8080 22
 

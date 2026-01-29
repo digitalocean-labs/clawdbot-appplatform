@@ -1,0 +1,3 @@
+// Auto-save package selections after every dpkg operation
+// This file is backed up as part of /etc and enables package restore
+DPkg::Post-Invoke { "dpkg --get-selections > /etc/moltbot/dpkg-selections 2>/dev/null || true"; };

@@ -6,7 +6,12 @@
 repository: "s3:${SPACES_ENDPOINT}/${SPACES_BUCKET}/restic"
 
 # Backup paths with per-path exclusions
+# Order matters for restore: /etc is restored first after packages
 paths:
+  - path: /etc
+    exclude:
+      - "moltbot/backup.yaml"  # Don't backup the backup config itself
+
   - path: /data/.moltbot
     exclude:
       - "memory/*"

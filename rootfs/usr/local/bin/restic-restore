@@ -1,10 +1,17 @@
 #!/command/with-contenv bash
 # Unified restore script using restic
 # Reads configuration from /etc/moltbot/backup.yaml
+#
+# Restore order:
+# 1. Restore dpkg-selections file
+# 2. Reinstall packages
+# 3. Restore /etc (first in config, overlays package defaults)
+# 4. Restore remaining paths
 
 set -e
 
 CONFIG_FILE="/etc/moltbot/backup.yaml"
+DPKG_SELECTIONS="/etc/moltbot/dpkg-selections"
 QUIET=""
 
 # Parse arguments
@@ -42,7 +49,26 @@ if ! restic snapshots --latest 1 2>/dev/null | grep -q .; then
   exit 0
 fi
 
-# Get number of paths to restore
+# Step 1: Restore dpkg-selections file first
+log "Restoring package selections..."
+if restic restore latest --target / --include "$DPKG_SELECTIONS" 2>&1; then
+  log "Package selections restored"
+else
+  log "Warning: Could not restore package selections (continuing)"
+fi
+
+# Step 2: Reinstall packages if selections file exists
+if [ -f "$DPKG_SELECTIONS" ]; then
+  log "Reinstalling packages from saved selections..."
+  dpkg --set-selections < "$DPKG_SELECTIONS"
+  apt-get update -qq
+  apt-get dselect-upgrade -y -qq || log "Warning: Some packages may have failed to install"
+  log "Package reinstallation complete"
+else
+  log "No package selections found, skipping package restore"
+fi
+
+# Step 3 & 4: Restore all paths in order (config has /etc first)
 PATH_COUNT=$(yq -r '.paths | length' "$CONFIG_FILE")
 
 if [ "$PATH_COUNT" -eq 0 ]; then
@@ -50,9 +76,8 @@ if [ "$PATH_COUNT" -eq 0 ]; then
   exit 0
 fi
 
-log "Starting restore of $PATH_COUNT paths..."
+log "Restoring $PATH_COUNT paths..."
 
-# Restore each path from latest snapshot
 for i in $(seq 0 $((PATH_COUNT - 1))); do
   RESTORE_PATH=$(yq -r ".paths[$i].path" "$CONFIG_FILE")
   
