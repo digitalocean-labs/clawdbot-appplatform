@@ -14,6 +14,7 @@ ARG LITESTREAM_VERSION=0.5.6
 
 ENV CLAWDBOT_STATE_DIR=/data/.clawdbot \
     CLAWDBOT_WORKSPACE_DIR=/data/workspace \
+    TS_STATE_DIR=/data/tailscale \
     NODE_ENV=production
 
 # Install OS deps + Litestream + s3cmd for state backup
@@ -44,7 +45,7 @@ RUN chmod +x /entrypoint.sh
 
 # Create non-root user with sudo access (needed for some clawdbot operations)
 RUN useradd -r -m -d /home/clawdbot clawdbot \
-    && mkdir -p "${CLAWDBOT_STATE_DIR}" "${CLAWDBOT_WORKSPACE_DIR}" \
+    && mkdir -p "${CLAWDBOT_STATE_DIR}" "${CLAWDBOT_WORKSPACE_DIR}" "${TS_STATE_DIR}" \
     && chown -R clawdbot:clawdbot /data \
     && echo 'clawdbot ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/clawdbot \
     && chmod 440 /etc/sudoers.d/clawdbot

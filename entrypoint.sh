@@ -4,9 +4,10 @@ set -e
 # Paths
 DEFAULT_CONFIG="/etc/clawdbot/moltbot.default.json"
 CONFIG_FILE="$CLAWDBOT_STATE_DIR/clawdbot.json"
+TS_STATE_DIR="${TS_STATE_DIR:-/data/tailscale}"
 
 # Ensure directories exist
-mkdir -p "$CLAWDBOT_STATE_DIR" "$CLAWDBOT_WORKSPACE_DIR" "$CLAWDBOT_STATE_DIR/memory"
+mkdir -p "$CLAWDBOT_STATE_DIR" "$CLAWDBOT_WORKSPACE_DIR" "$CLAWDBOT_STATE_DIR/memory" "$TS_STATE_DIR"
 
 # Configure s3cmd for DO Spaces
 configure_s3cmd() {
@@ -25,16 +26,28 @@ if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
   echo "Restoring state from Spaces backup..."
   configure_s3cmd
 
-  # Restore JSON state files (config, devices, sessions) via tar
+  # Restore clawdbot state files (config, devices, sessions) via tar
   STATE_BACKUP_PATH="s3://${SPACES_BUCKET}/clawdbot/state-backup.tar.gz"
   if s3cmd -c /tmp/.s3cfg ls "$STATE_BACKUP_PATH" 2>/dev/null | grep -q state-backup; then
-    echo "Downloading state backup..."
+    echo "Downloading clawdbot state backup..."
     s3cmd -c /tmp/.s3cfg get "$STATE_BACKUP_PATH" /tmp/state-backup.tar.gz && \
       tar -xzf /tmp/state-backup.tar.gz -C "$CLAWDBOT_STATE_DIR" || \
-      echo "Warning: failed to restore state backup (continuing)"
+      echo "Warning: failed to restore clawdbot state backup (continuing)"
     rm -f /tmp/state-backup.tar.gz
   else
-    echo "No state backup found (first deployment)"
+    echo "No clawdbot state backup found (first deployment)"
+  fi
+
+  # Restore Tailscale state
+  TS_BACKUP_PATH="s3://${SPACES_BUCKET}/clawdbot/tailscale-state.tar.gz"
+  if s3cmd -c /tmp/.s3cfg ls "$TS_BACKUP_PATH" 2>/dev/null | grep -q tailscale-state; then
+    echo "Downloading Tailscale state backup..."
+    s3cmd -c /tmp/.s3cfg get "$TS_BACKUP_PATH" /tmp/tailscale-state.tar.gz && \
+      tar -xzf /tmp/tailscale-state.tar.gz -C "$TS_STATE_DIR" || \
+      echo "Warning: failed to restore Tailscale state backup (continuing)"
+    rm -f /tmp/tailscale-state.tar.gz
+  else
+    echo "No Tailscale state backup found (first deployment)"
   fi
 
   # Restore SQLite memory database via Litestream
@@ -183,27 +196,50 @@ fi
 echo "Final config:"
 jq '.' "$CONFIG_FILE"
 
-# Backup function for JSON state files
+# Backup function for clawdbot state files
+backup_clawdbot_state() {
+  echo "Backing up clawdbot state to Spaces..."
+  cd "$CLAWDBOT_STATE_DIR"
+  # Backup JSON files (exclude memory/ which Litestream handles)
+  tar -czf /tmp/state-backup.tar.gz \
+    --exclude='memory' \
+    --exclude='*.sqlite*' \
+    --exclude='*.db*' \
+    --exclude='gateway.*.lock' \
+    . 2>/dev/null || true
+
+  # Upload to Spaces using s3cmd
+  if [ -f /tmp/state-backup.tar.gz ]; then
+    s3cmd -c /tmp/.s3cfg put /tmp/state-backup.tar.gz \
+      "s3://${SPACES_BUCKET}/clawdbot/state-backup.tar.gz" && \
+      echo "Clawdbot state backup uploaded" || \
+      echo "Warning: clawdbot state backup upload failed"
+    rm -f /tmp/state-backup.tar.gz
+  fi
+}
+
+# Backup function for Tailscale state
+backup_tailscale_state() {
+  if [ "$GATEWAY_MODE" = "tailscale" ] && [ -d "$TS_STATE_DIR" ]; then
+    echo "Backing up Tailscale state to Spaces..."
+    cd "$TS_STATE_DIR"
+    tar -czf /tmp/tailscale-state.tar.gz . 2>/dev/null || true
+
+    if [ -f /tmp/tailscale-state.tar.gz ]; then
+      s3cmd -c /tmp/.s3cfg put /tmp/tailscale-state.tar.gz \
+        "s3://${SPACES_BUCKET}/clawdbot/tailscale-state.tar.gz" && \
+        echo "Tailscale state backup uploaded" || \
+        echo "Warning: Tailscale state backup upload failed"
+      rm -f /tmp/tailscale-state.tar.gz
+    fi
+  fi
+}
+
+# Combined backup function
 backup_state() {
   if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
-    echo "Backing up state to Spaces..."
-    cd "$CLAWDBOT_STATE_DIR"
-    # Backup JSON files (exclude memory/ which Litestream handles)
-    tar -czf /tmp/state-backup.tar.gz \
-      --exclude='memory' \
-      --exclude='*.sqlite*' \
-      --exclude='*.db*' \
-      --exclude='gateway.*.lock' \
-      . 2>/dev/null || true
-
-    # Upload to Spaces using s3cmd
-    if [ -f /tmp/state-backup.tar.gz ]; then
-      s3cmd -c /tmp/.s3cfg put /tmp/state-backup.tar.gz \
-        "s3://${SPACES_BUCKET}/clawdbot/state-backup.tar.gz" && \
-        echo "State backup uploaded" || \
-        echo "Warning: state backup upload failed"
-      rm -f /tmp/state-backup.tar.gz
-    fi
+    backup_clawdbot_state
+    backup_tailscale_state
   fi
 }
 
@@ -226,6 +262,8 @@ trap shutdown_handler SIGTERM SIGINT
 # Start Tailscale if in tailscale mode
 if [ "$GATEWAY_MODE" = "tailscale" ]; then
   echo "Starting Tailscale daemon..."
+  # Export TS_STATE_DIR so containerboot uses our state directory
+  export TS_STATE_DIR
   /usr/local/bin/containerboot &
 fi
 
