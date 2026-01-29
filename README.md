@@ -201,7 +201,6 @@ exec my-daemon --foreground
 
 | Script | Description |
 |--------|-------------|
-| `00-set-hostname` | Sets hostname from `TS_HOSTNAME` |
 | `05-setup-restic` | Configures restic for DO Spaces backup |
 | `06-restore-packages` | Restores user-installed packages from backup |
 | `10-restore-state` | Restores state paths from restic backup |

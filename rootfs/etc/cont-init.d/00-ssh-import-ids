@@ -1,5 +1,12 @@
 #!/command/with-contenv bash
 # Import SSH keys from GitHub
 
-# This imports the SSH keys from the GitHub username into the SSH agent for the root user
-ssh-import-id-gh "$GITHUB_USERNAME"
+# Skip if no GitHub username configured
+if [ -z "$GITHUB_USERNAME" ]; then
+  echo "[ssh-import] No GITHUB_USERNAME set, skipping"
+  exit 0
+fi
+
+# Import SSH keys for ubuntu user
+echo "[ssh-import] Importing SSH keys for $GITHUB_USERNAME"
+su - ubuntu -c "ssh-import-id gh:$GITHUB_USERNAME" || echo "[ssh-import] Warning: failed to import keys"

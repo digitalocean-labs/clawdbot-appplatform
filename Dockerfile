@@ -87,20 +87,25 @@ RUN useradd -m -d /home/moltbot -s /bin/bash moltbot \
     && chmod 440 /etc/sudoers.d/moltbot \
     && mkdir -p /home/moltbot/.ssh \
     && chmod 700 /home/moltbot/.ssh \
-    && chown moltbot:moltbot /home/moltbot/.ssh
+    && chown moltbot:moltbot /home/moltbot/.ssh \
+    # Setup ubuntu user for SSH
+    && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu \
+    && chmod 440 /etc/sudoers.d/ubuntu \
+    && mkdir -p /home/ubuntu/.ssh \
+    && chmod 700 /home/ubuntu/.ssh \
+    && chown ubuntu:ubuntu /home/ubuntu/.ssh
 
-# nvm and pnpm paths
-ENV NVM_DIR="/home/moltbot/.nvm"
-ENV PNPM_HOME="/home/moltbot/.local/share/pnpm"
-ENV PATH="${PNPM_HOME}:${PATH}"
-
-# Create directories
-RUN mkdir -p ${PNPM_HOME} && chown -R moltbot:moltbot /home/moltbot/.local
+# Create pnpm directory
+RUN mkdir -p /home/moltbot/.local/share/pnpm && chown -R moltbot:moltbot /home/moltbot/.local
 
 USER moltbot
 
 # Install nvm, Node.js LTS, pnpm, and moltbot
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash \
+# NVM_DIR and PNPM_HOME are set in /home/moltbot/.profile for runtime
+RUN export NVM_DIR="$HOME/.nvm" \
+    && export PNPM_HOME="$HOME/.local/share/pnpm" \
+    && export PATH="$PNPM_HOME:$PATH" \
+    && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash \
     && . "$NVM_DIR/nvm.sh" \
     && nvm install --lts \
     && nvm use --lts \
@@ -116,13 +121,12 @@ USER root
 COPY rootfs/ /
 
 # Fix ownership for any files copied to moltbot's home
-RUN chown -R moltbot:moltbot /home/moltbot 2>/dev/null || true
+RUN chown -R moltbot:moltbot /home/moltbot
+RUN chown -R ubuntu:ubuntu /home/ubuntu
 
 # Generate initial package selections list (for restore capability)
 RUN dpkg --get-selections > /etc/moltbot/dpkg-selections
 
-# Expose ports: 8080 for LAN mode, 22 for SSH
-EXPOSE 8080 22
 
 # s6-overlay init (must run as root, services drop privileges as needed)
 ENTRYPOINT ["/init"]
