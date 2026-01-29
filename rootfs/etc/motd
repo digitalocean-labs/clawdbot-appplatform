@@ -8,3 +8,5 @@
   Moltbot App Platform Container
   https://github.com/digitalocean-labs/clawdbot-appplatform
 
+
+To get a shell as the moltbot user, use `sudo -i -u moltbot bash`
