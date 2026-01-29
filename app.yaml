@@ -1,37 +1,36 @@
-name: clawdbot
+name: moltbot
 region: tor  # Toronto (default)
 # Available regions: nyc, ams, sfo, sgp, lon, fra, blr, syd, tor
 
-services:
-  - name: clawdbot
-    image:
-      registry_type: GHCR
-      registry: digitalocean-labs
-      repository: clawdbot-appplatform
-      tag: latest
+# Note: This is a reference config. For Tailscale networking,
+# use .do/deploy.template.yaml which deploys as a worker.
+
+workers:
+  - name: moltbot
+    dockerfile_path: /Dockerfile
     instance_count: 1
-    instance_size_slug: apps-s-1vcpu-2gb  # 1 shared vCPU, 2GB RAM, ~$25/mo
-    http_port: 8080
-    health_check:
-      http_path: /health
-      initial_delay_seconds: 60
-      period_seconds: 10
+    instance_size_slug: apps-s-2vcpu-4gb
     envs:
       # Required
-      - key: PORT
-        value: "8080"
+      - key: TS_AUTHKEY
+        scope: RUN_TIME
+        type: SECRET
       - key: SETUP_PASSWORD
         scope: RUN_TIME
         type: SECRET
-      - key: CLAWDBOT_STATE_DIR
-        value: /data/.clawdbot
-      - key: CLAWDBOT_WORKSPACE_DIR
+      - key: MOLTBOT_STATE_DIR
+        value: /data/.moltbot
+      - key: MOLTBOT_WORKSPACE_DIR
         value: /data/workspace
-      # Gateway mode: lan for public HTTP access
-      - key: CLAWDBOT_GATEWAY_MODE
-        value: lan
+      # Tailscale configuration
+      - key: TS_HOSTNAME
+        value: moltbot
+      - key: TS_USERSPACE
+        value: "true"
+      - key: TS_SOCKET
+        value: /tmp/tailscaled.sock
       # Recommended
-      - key: CLAWDBOT_GATEWAY_TOKEN
+      - key: MOLTBOT_GATEWAY_TOKEN
         scope: RUN_TIME
         type: SECRET
       # Optional: Litestream + Spaces persistence
@@ -45,7 +44,7 @@ services:
       # - key: SPACES_ENDPOINT
       #   value: tor1.digitaloceanspaces.com
       # - key: SPACES_BUCKET
-      #   value: clawdbot-backup
+      #   value: moltbot-backup
       # Optional: Gradient AI
       # - key: GRADIENT_API_KEY
       #   scope: RUN_TIME

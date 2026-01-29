@@ -1,41 +1,32 @@
-# Clawdbot App Platform Deployment
+# Moltbot App Platform Deployment
 
 ## Overview
 
-This repository contains the Docker configuration and deployment templates for running [Clawdbot](https://github.com/clawdbot/clawdbot) on DigitalOcean App Platform.
+This repository contains the Docker configuration and deployment templates for running [Moltbot](https://github.com/moltbot/moltbot) on DigitalOcean App Platform with Tailscale networking.
 
 ## Key Files
 
-- `Dockerfile` - Builds image with Tailscale, Homebrew, pnpm, and clawdbot
-- `entrypoint.sh` - Builds config from env vars and starts gateway
-- `app.yaml` - App Platform service configuration (LAN mode)
-- `.do/deploy.template.yaml` - App Platform worker configuration (Tailscale mode)
+- `Dockerfile` - Builds image with Ubuntu Noble, Tailscale, Homebrew, pnpm, and moltbot
+- `entrypoint.sh` - Builds config from env vars, starts Tailscale, and launches gateway
+- `app.yaml` - App Platform service configuration (for reference, uses worker for Tailscale)
+- `.do/deploy.template.yaml` - App Platform worker configuration (recommended)
 - `litestream.yml` - SQLite replication config for persistence via DO Spaces
+- `moltbot.default.json` - Base gateway configuration
 - `tailscale` - Wrapper script to inject socket path for tailscale CLI
+- `rootfs/` - Overlay directory for custom files
 
-## Gateway Modes
+## Networking
 
-The gateway mode is controlled by `CLAWDBOT_GATEWAY_MODE` env var:
+Tailscale is required for networking. The gateway binds to loopback and uses Tailscale serve mode for access via your tailnet.
 
-### Tailscale Mode (default)
-- `CLAWDBOT_GATEWAY_MODE=tailscale`
-- Access via private tailnet
-- Requires `TS_AUTHKEY`
-- Deploy as worker (not service)
-- Config: `bind: loopback`, `tailscale.mode: serve`
-
-### LAN Mode
-- `CLAWDBOT_GATEWAY_MODE=lan`
-- Public HTTP access on `PORT` (default 8080)
-- Behind Cloudflare proxy (trustedProxies enabled)
-- Auth via password (`SETUP_PASSWORD`) or token
+Required environment variables:
+- `TS_AUTHKEY` - Tailscale auth key
 
 ## Configuration
 
-All gateway settings are driven by the config file (`clawdbot.json`), not CLI params. The entrypoint dynamically builds the config based on environment variables:
+All gateway settings are driven by the config file (`moltbot.json`). The entrypoint dynamically builds the config based on environment variables:
 
-- Gateway mode and binding
-- Auth mode (tailscale, password, or token)
+- Tailscale serve mode for networking
 - Gradient AI provider (if `GRADIENT_API_KEY` set)
 
 ## Gradient AI Integration
@@ -50,3 +41,4 @@ Set `GRADIENT_API_KEY` to enable DigitalOcean's serverless AI inference with mod
 Optional DO Spaces backup via Litestream + s3cmd:
 - SQLite: real-time replication via Litestream
 - JSON state: periodic backup every 5 minutes
+- Tailscale state: periodic backup every 5 minutes

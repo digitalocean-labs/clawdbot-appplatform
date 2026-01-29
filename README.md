@@ -1,13 +1,13 @@
-# Clawdbot App Platform Image
+# Moltbot App Platform Image
 
-Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/clawdbot) on DigitalOcean App Platform.
+Pre-built Docker image for deploying [Moltbot](https://github.com/moltbot/moltbot) on DigitalOcean App Platform with Tailscale networking.
 
-[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean-labs/clawdbot-appplatform/tree/main)
+[![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean-labs/moltbot-appplatform/tree/main)
 
 ## Features
 
 - **Fast boot** (~30 seconds vs 5-10 min source build)
-- **Flexible networking** - Tailscale (private) or LAN (public) modes
+- **Private networking** via Tailscale - secure access without public exposure
 - **Optional persistence** via Litestream + DO Spaces
 - **Gradient AI support** - Use DigitalOcean's serverless AI inference
 - **SSH access** - Optional SSH server for remote access
@@ -16,21 +16,21 @@ Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/claw
 ## Quick Start
 
 1. Click the **Deploy to DO** button above
-2. Set `SETUP_PASSWORD` when prompted
+2. Set required environment variables (see below)
 3. Wait for deployment (~1 minute)
-4. Open `https://<your-app>.ondigitalocean.app/setup` to complete setup
+4. Access via `https://moltbot.<your-tailnet>.ts.net`
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                    clawdbot-appplatform                          │
+│                     moltbot-appplatform                          │
 │  ┌─────────────┐  ┌───────────┐  ┌──────────────────────────┐   │
-│  │ Ubuntu      │  │ Clawdbot  │  │ Litestream (optional)    │   │
+│  │ Ubuntu      │  │ Moltbot   │  │ Litestream (optional)    │   │
 │  │ Noble+Node  │  │ (latest)  │  │ SQLite → DO Spaces       │   │
 │  └─────────────┘  └───────────┘  └──────────────────────────┘   │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │ Tailscale (optional) - Private networking via tailnet      ││
+│  │ Tailscale - Private networking via tailnet (required)      ││
 │  └─────────────────────────────────────────────────────────────┘│
 │  ┌─────────────────────────────────────────────────────────────┐│
 │  │ SSH Server (optional) - Remote access via ENABLE_SSH=true  ││
@@ -44,27 +44,15 @@ Pre-built Docker image for deploying [Clawdbot](https://github.com/clawdbot/claw
 
 | Variable | Description |
 |----------|-------------|
+| `TS_AUTHKEY` | Tailscale auth key for joining your tailnet |
 | `SETUP_PASSWORD` | Password for the web setup wizard |
 
 ### Recommended
 
 | Variable | Description |
 |----------|-------------|
-| `CLAWDBOT_GATEWAY_TOKEN` | Admin token for gateway API access |
-
-### Gateway Mode
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CLAWDBOT_GATEWAY_MODE` | `tailscale` or `lan` | `tailscale` |
-| `PORT` | HTTP port (LAN mode only) | `8080` |
-
-**Tailscale mode** (default): Access via your private tailnet. Requires:
-- `TS_AUTHKEY` - Tailscale auth key
-- Deploy as a **worker** (not service)
-
-**LAN mode**: Public HTTP access behind Cloudflare/App Platform proxy. Requires:
-- `SETUP_PASSWORD` for password auth, or uses token auth
+| `TS_HOSTNAME` | Hostname on your tailnet (default: container hostname) |
+| `MOLTBOT_GATEWAY_TOKEN` | Admin token for gateway API access |
 
 ### Optional (SSH)
 
@@ -84,13 +72,6 @@ When set, adds Gradient as a model provider with access to:
 - Claude Opus 4.5
 - DeepSeek R1 Distill Llama 70B
 
-### Optional (Tailscale)
-
-| Variable | Description |
-|----------|-------------|
-| `TS_AUTHKEY` | Tailscale auth key for joining your tailnet |
-| `TS_HOSTNAME` | Hostname on your tailnet |
-
 ### Optional (Persistence)
 
 Without these, the app runs in ephemeral mode - state is lost on redeploy.
@@ -100,7 +81,7 @@ Without these, the app runs in ephemeral mode - state is lost on redeploy.
 | `LITESTREAM_ACCESS_KEY_ID` | DO Spaces access key | |
 | `LITESTREAM_SECRET_ACCESS_KEY` | DO Spaces secret key | |
 | `SPACES_ENDPOINT` | Spaces endpoint | `tor1.digitaloceanspaces.com` |
-| `SPACES_BUCKET` | Spaces bucket name | `my-clawdbot-backup` |
+| `SPACES_BUCKET` | Spaces bucket name | `my-moltbot-backup` |
 
 ## Resource Requirements
 
@@ -131,8 +112,8 @@ Edit the `region` field in `app.yaml` to change.
 
 ```bash
 # Clone and deploy
-git clone https://github.com/digitalocean-labs/clawdbot-appplatform
-cd clawdbot-appplatform
+git clone https://github.com/digitalocean-labs/moltbot-appplatform
+cd moltbot-appplatform
 
 # Validate spec
 doctl apps spec validate app.yaml
@@ -157,8 +138,8 @@ rootfs/
 │   │       └── 10-custom.conf     → /etc/ssh/sshd_config.d/10-custom.conf
 │   └── motd                        → /etc/motd
 └── home/
-    └── clawdbot/
-        └── .bashrc                 → /home/clawdbot/.bashrc
+    └── moltbot/
+        └── .bashrc                 → /home/moltbot/.bashrc
 ```
 
 ### Notes
@@ -183,7 +164,7 @@ App Platform doesn't have persistent volumes, so this image uses DO Spaces for s
 
 1. **Create a Spaces bucket** in the same region as your app
    - Go to **Spaces Object Storage** → **Create Bucket**
-   - Name: e.g., `clawdbot-backup`
+   - Name: e.g., `moltbot-backup`
    - Region: match your app (e.g., `tor1` for Toronto)
 
 2. **Create Spaces access keys**
@@ -214,18 +195,18 @@ During operation:
 
 ## Tailscale Setup
 
-For private access via Tailscale instead of public HTTP:
+Tailscale is required for networking. To set up:
 
-1. Set `CLAWDBOT_GATEWAY_MODE=tailscale`
-2. Create a Tailscale auth key at https://login.tailscale.com/admin/settings/keys
-3. Set `TS_AUTHKEY` to your auth key
+1. Create a Tailscale auth key at https://login.tailscale.com/admin/settings/keys
+2. Set `TS_AUTHKEY` environment variable
+3. Optionally set `TS_HOSTNAME` for a custom hostname
 4. Deploy as a **worker** (use `.do/deploy.template.yaml`)
-5. Access via `https://clawdbot.<your-tailnet>.ts.net`
+5. Access via `https://moltbot.<your-tailnet>.ts.net`
 
 ## Documentation
 
-- [Full deployment guide](https://docs.clawd.bot/digitalocean)
-- [Clawdbot documentation](https://docs.clawd.bot)
+- [Full deployment guide](https://docs.molt.bot/digitalocean)
+- [Moltbot documentation](https://docs.molt.bot)
 
 ## License
 

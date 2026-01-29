@@ -9,12 +9,12 @@ COPY --from=tailscale /usr/local/bin/containerboot /usr/local/bin/containerboot
 COPY tailscale /usr/local/bin/tailscale
 
 ARG TARGETARCH
-ARG CLAWDBOT_VERSION=latest
+ARG MOLTBOT_VERSION=latest
 ARG LITESTREAM_VERSION=0.5.6
 ARG NODE_MAJOR=24
 
-ENV CLAWDBOT_STATE_DIR=/data/.clawdbot \
-    CLAWDBOT_WORKSPACE_DIR=/data/workspace \
+ENV MOLTBOT_STATE_DIR=/data/.moltbot \
+    MOLTBOT_WORKSPACE_DIR=/data/workspace \
     TS_STATE_DIR=/data/tailscale \
     NODE_ENV=production \
     DEBIAN_FRONTEND=noninteractive
@@ -55,35 +55,35 @@ RUN set -eux; \
 # Copy configuration files
 COPY entrypoint.sh /entrypoint.sh
 COPY litestream.yml /etc/litestream.yml
-COPY moltbot.default.json /etc/clawdbot/moltbot.default.json
+COPY moltbot.default.json /etc/moltbot/moltbot.default.json
 RUN chmod +x /entrypoint.sh
 
 # Create non-root user with sudo access and SSH capability
-RUN useradd -m -d /home/clawdbot -s /bin/bash clawdbot \
-    && mkdir -p "${CLAWDBOT_STATE_DIR}" "${CLAWDBOT_WORKSPACE_DIR}" "${TS_STATE_DIR}" \
-    && chown -R clawdbot:clawdbot /data \
-    && echo 'clawdbot ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/clawdbot \
-    && chmod 440 /etc/sudoers.d/clawdbot \
-    && mkdir -p /home/clawdbot/.ssh \
-    && chmod 700 /home/clawdbot/.ssh \
-    && chown clawdbot:clawdbot /home/clawdbot/.ssh
+RUN useradd -m -d /home/moltbot -s /bin/bash moltbot \
+    && mkdir -p "${MOLTBOT_STATE_DIR}" "${MOLTBOT_WORKSPACE_DIR}" "${TS_STATE_DIR}" \
+    && chown -R moltbot:moltbot /data \
+    && echo 'moltbot ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/moltbot \
+    && chmod 440 /etc/sudoers.d/moltbot \
+    && mkdir -p /home/moltbot/.ssh \
+    && chmod 700 /home/moltbot/.ssh \
+    && chown moltbot:moltbot /home/moltbot/.ssh
 
 # Homebrew and pnpm paths
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
-ENV PNPM_HOME="/home/clawdbot/.local/share/pnpm"
+ENV PNPM_HOME="/home/moltbot/.local/share/pnpm"
 ENV PATH="${PNPM_HOME}:${PATH}"
 
 # Create pnpm directory
-RUN mkdir -p ${PNPM_HOME} && chown -R clawdbot:clawdbot /home/clawdbot/.local
+RUN mkdir -p ${PNPM_HOME} && chown -R moltbot:moltbot /home/moltbot/.local
 
-USER clawdbot
+USER moltbot
 
 # Install Homebrew (must run as non-root)
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# Install pnpm and clawdbot
+# Install pnpm and moltbot
 RUN brew install pnpm \
-    && pnpm add -g "clawdbot@${CLAWDBOT_VERSION}"
+    && pnpm add -g "moltbot@${MOLTBOT_VERSION}"
 
 # Switch back to root for final overlay
 USER root
@@ -92,11 +92,11 @@ USER root
 # This is done last so user customizations take precedence
 COPY rootfs/ /
 
-# Fix ownership for any files copied to clawdbot's home
-RUN chown -R clawdbot:clawdbot /home/clawdbot 2>/dev/null || true
+# Fix ownership for any files copied to moltbot's home
+RUN chown -R moltbot:moltbot /home/moltbot 2>/dev/null || true
 
-# Switch back to clawdbot for runtime
-USER clawdbot
+# Switch back to moltbot for runtime
+USER moltbot
 
 # Expose ports: 8080 for LAN mode, 22 for SSH
 EXPOSE 8080 22

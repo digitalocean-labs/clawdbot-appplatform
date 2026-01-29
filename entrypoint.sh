@@ -2,12 +2,12 @@
 set -e
 
 # Paths
-DEFAULT_CONFIG="/etc/clawdbot/moltbot.default.json"
-CONFIG_FILE="$CLAWDBOT_STATE_DIR/clawdbot.json"
+DEFAULT_CONFIG="/etc/moltbot/moltbot.default.json"
+CONFIG_FILE="$MOLTBOT_STATE_DIR/moltbot.json"
 TS_STATE_DIR="${TS_STATE_DIR:-/data/tailscale}"
 
 # Ensure directories exist
-mkdir -p "$CLAWDBOT_STATE_DIR" "$CLAWDBOT_WORKSPACE_DIR" "$CLAWDBOT_STATE_DIR/memory" "$TS_STATE_DIR"
+mkdir -p "$MOLTBOT_STATE_DIR" "$MOLTBOT_WORKSPACE_DIR" "$MOLTBOT_STATE_DIR/memory" "$TS_STATE_DIR"
 
 # Configure s3cmd for DO Spaces
 configure_s3cmd() {
@@ -26,20 +26,20 @@ if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
   echo "Restoring state from Spaces backup..."
   configure_s3cmd
 
-  # Restore clawdbot state files (config, devices, sessions) via tar
-  STATE_BACKUP_PATH="s3://${SPACES_BUCKET}/clawdbot/state-backup.tar.gz"
+  # Restore moltbot state files (config, devices, sessions) via tar
+  STATE_BACKUP_PATH="s3://${SPACES_BUCKET}/moltbot/state-backup.tar.gz"
   if s3cmd -c /tmp/.s3cfg ls "$STATE_BACKUP_PATH" 2>/dev/null | grep -q state-backup; then
-    echo "Downloading clawdbot state backup..."
+    echo "Downloading moltbot state backup..."
     s3cmd -c /tmp/.s3cfg get "$STATE_BACKUP_PATH" /tmp/state-backup.tar.gz && \
-      tar -xzf /tmp/state-backup.tar.gz -C "$CLAWDBOT_STATE_DIR" || \
-      echo "Warning: failed to restore clawdbot state backup (continuing)"
+      tar -xzf /tmp/state-backup.tar.gz -C "$MOLTBOT_STATE_DIR" || \
+      echo "Warning: failed to restore moltbot state backup (continuing)"
     rm -f /tmp/state-backup.tar.gz
   else
-    echo "No clawdbot state backup found (first deployment)"
+    echo "No moltbot state backup found (first deployment)"
   fi
 
   # Restore Tailscale state
-  TS_BACKUP_PATH="s3://${SPACES_BUCKET}/clawdbot/tailscale-state.tar.gz"
+  TS_BACKUP_PATH="s3://${SPACES_BUCKET}/moltbot/tailscale-state.tar.gz"
   if s3cmd -c /tmp/.s3cfg ls "$TS_BACKUP_PATH" 2>/dev/null | grep -q tailscale-state; then
     echo "Downloading Tailscale state backup..."
     s3cmd -c /tmp/.s3cfg get "$TS_BACKUP_PATH" /tmp/tailscale-state.tar.gz && \
@@ -53,15 +53,15 @@ if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
   # Restore SQLite memory database via Litestream
   echo "Restoring SQLite from Litestream..."
   litestream restore -if-replica-exists -config /etc/litestream.yml \
-    "$CLAWDBOT_STATE_DIR/memory/main.sqlite" || true
+    "$MOLTBOT_STATE_DIR/memory/main.sqlite" || true
 fi
 
 # Show version
-echo "Clawdbot version: $(clawdbot --version 2>/dev/null || echo 'unknown')"
+echo "Moltbot version: $(moltbot --version 2>/dev/null || echo 'unknown')"
 
 # Generate a gateway token if not provided
-if [ -z "$CLAWDBOT_GATEWAY_TOKEN" ]; then
-  export CLAWDBOT_GATEWAY_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -d '=/+' | head -c 32)
+if [ -z "$MOLTBOT_GATEWAY_TOKEN" ]; then
+  export MOLTBOT_GATEWAY_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -d '=/+' | head -c 32)
   echo "Generated gateway token (ephemeral)"
 fi
 
@@ -78,13 +78,9 @@ else
   echo "Warning: Default config not found, using minimal config"
 fi
 
-# Determine gateway mode: tailscale (default) or lan
-GATEWAY_MODE="${CLAWDBOT_GATEWAY_MODE:-tailscale}"
-
-# Build mode-specific overlay
-if [ "$GATEWAY_MODE" = "tailscale" ]; then
-  echo "Gateway mode: Tailscale"
-  MODE_CONFIG=$(cat << 'MODEEOF'
+# Tailscale gateway configuration
+echo "Gateway mode: Tailscale"
+MODE_CONFIG=$(cat << 'MODEEOF'
 {
   "gateway": {
     "bind": "loopback",
@@ -96,33 +92,6 @@ if [ "$GATEWAY_MODE" = "tailscale" ]; then
 }
 MODEEOF
 )
-else
-  # LAN mode - bind to all interfaces
-  PORT="${PORT:-8080}"
-  echo "Gateway mode: LAN (port $PORT)"
-  
-  # Determine auth mode based on SETUP_PASSWORD
-  if [ -n "$SETUP_PASSWORD" ]; then
-    AUTH_MODE="password"
-    echo "Auth: password"
-  else
-    AUTH_MODE="token"
-    echo "Auth: token"
-  fi
-
-  MODE_CONFIG=$(cat << MODEEOF
-{
-  "gateway": {
-    "port": $PORT,
-    "bind": "lan",
-    "auth": {
-      "mode": "$AUTH_MODE"
-    }
-  }
-}
-MODEEOF
-)
-fi
 
 # Merge mode config into base config (deep merge)
 jq --argjson mode "$MODE_CONFIG" '. * $mode' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" \
@@ -196,10 +165,10 @@ fi
 echo "Final config:"
 jq '.' "$CONFIG_FILE"
 
-# Backup function for clawdbot state files
-backup_clawdbot_state() {
-  echo "Backing up clawdbot state to Spaces..."
-  cd "$CLAWDBOT_STATE_DIR"
+# Backup function for moltbot state files
+backup_moltbot_state() {
+  echo "Backing up moltbot state to Spaces..."
+  cd "$MOLTBOT_STATE_DIR"
   # Backup JSON files (exclude memory/ which Litestream handles)
   tar -czf /tmp/state-backup.tar.gz \
     --exclude='memory' \
@@ -211,23 +180,23 @@ backup_clawdbot_state() {
   # Upload to Spaces using s3cmd
   if [ -f /tmp/state-backup.tar.gz ]; then
     s3cmd -c /tmp/.s3cfg put /tmp/state-backup.tar.gz \
-      "s3://${SPACES_BUCKET}/clawdbot/state-backup.tar.gz" && \
-      echo "Clawdbot state backup uploaded" || \
-      echo "Warning: clawdbot state backup upload failed"
+      "s3://${SPACES_BUCKET}/moltbot/state-backup.tar.gz" && \
+      echo "Moltbot state backup uploaded" || \
+      echo "Warning: moltbot state backup upload failed"
     rm -f /tmp/state-backup.tar.gz
   fi
 }
 
 # Backup function for Tailscale state
 backup_tailscale_state() {
-  if [ "$GATEWAY_MODE" = "tailscale" ] && [ -d "$TS_STATE_DIR" ]; then
+  if [ -d "$TS_STATE_DIR" ]; then
     echo "Backing up Tailscale state to Spaces..."
     cd "$TS_STATE_DIR"
     tar -czf /tmp/tailscale-state.tar.gz . 2>/dev/null || true
 
     if [ -f /tmp/tailscale-state.tar.gz ]; then
       s3cmd -c /tmp/.s3cfg put /tmp/tailscale-state.tar.gz \
-        "s3://${SPACES_BUCKET}/clawdbot/tailscale-state.tar.gz" && \
+        "s3://${SPACES_BUCKET}/moltbot/tailscale-state.tar.gz" && \
         echo "Tailscale state backup uploaded" || \
         echo "Warning: Tailscale state backup upload failed"
       rm -f /tmp/tailscale-state.tar.gz
@@ -238,7 +207,7 @@ backup_tailscale_state() {
 # Combined backup function
 backup_state() {
   if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
-    backup_clawdbot_state
+    backup_moltbot_state
     backup_tailscale_state
   fi
 }
@@ -259,13 +228,10 @@ shutdown_handler() {
 }
 trap shutdown_handler SIGTERM SIGINT
 
-# Start Tailscale if in tailscale mode
-if [ "$GATEWAY_MODE" = "tailscale" ]; then
-  echo "Starting Tailscale daemon..."
-  # Export TS_STATE_DIR so containerboot uses our state directory
-  export TS_STATE_DIR
-  /usr/local/bin/containerboot &
-fi
+# Start Tailscale daemon (required for networking)
+echo "Starting Tailscale daemon..."
+export TS_STATE_DIR
+/usr/local/bin/containerboot &
 
 # Start SSH server if enabled
 if [ "${ENABLE_SSH:-false}" = "true" ]; then
@@ -278,7 +244,7 @@ if [ "${ENABLE_SSH:-false}" = "true" ]; then
 fi
 
 # Start gateway - all configuration is in the config file
-echo "Starting clawdbot gateway..."
+echo "Starting moltbot gateway..."
 if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
   echo "Mode: Litestream + state backup enabled"
 
@@ -287,12 +253,12 @@ if [ -n "$LITESTREAM_ACCESS_KEY_ID" ] && [ -n "$SPACES_BUCKET" ]; then
 
   # Run gateway with Litestream for SQLite replication
   litestream replicate -config /etc/litestream.yml \
-    -exec "clawdbot gateway --allow-unconfigured" &
+    -exec "moltbot gateway --allow-unconfigured" &
   GATEWAY_PID=$!
 
   # Wait for gateway and handle shutdown
   wait $GATEWAY_PID
 else
   echo "Mode: ephemeral (no persistence)"
-  exec clawdbot gateway --allow-unconfigured
+  exec moltbot gateway --allow-unconfigured
 fi

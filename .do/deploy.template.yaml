@@ -5,32 +5,28 @@ spec:
   features:
   - buildpack-stack=ubuntu-22
   ingress: {}
-  name: clawdbot
+  name: moltbot
   region: tor
   workers:
   - dockerfile_path: /Dockerfile
     envs:
     # Required
-    - key: SETUP_PASSWORD
-      scope: RUN_TIME
-      type: SECRET
-    - key: CLAWDBOT_STATE_DIR
-      scope: RUN_AND_BUILD_TIME
-      value: /data/.clawdbot
-    - key: CLAWDBOT_WORKSPACE_DIR
-      scope: RUN_AND_BUILD_TIME
-      value: /data/workspace
-    # Gateway mode: tailscale for private access
-    - key: CLAWDBOT_GATEWAY_MODE
-      scope: RUN_AND_BUILD_TIME
-      value: tailscale
-    # Tailscale configuration
     - key: TS_AUTHKEY
       scope: RUN_TIME
       type: SECRET
+    - key: SETUP_PASSWORD
+      scope: RUN_TIME
+      type: SECRET
+    - key: MOLTBOT_STATE_DIR
+      scope: RUN_AND_BUILD_TIME
+      value: /data/.moltbot
+    - key: MOLTBOT_WORKSPACE_DIR
+      scope: RUN_AND_BUILD_TIME
+      value: /data/workspace
+    # Tailscale configuration
     - key: TS_HOSTNAME
       scope: RUN_AND_BUILD_TIME
-      value: clawdbot
+      value: moltbot
     - key: TS_USERSPACE
       scope: RUN_AND_BUILD_TIME
       value: "true"
@@ -49,7 +45,7 @@ spec:
     #   value: tor1.digitaloceanspaces.com
     # - key: SPACES_BUCKET
     #   scope: RUN_AND_BUILD_TIME
-    #   value: clawdbot-backup
+    #   value: moltbot-backup
     # Optional: Uncomment for Gradient AI
     # - key: GRADIENT_API_KEY
     #   scope: RUN_TIME
@@ -57,8 +53,8 @@ spec:
     github:
       branch: main
       deploy_on_push: true
-      repo: digitalocean-labs/clawdbot-appplatform
+      repo: digitalocean-labs/moltbot-appplatform
     instance_count: 1
     instance_size_slug: apps-s-2vcpu-4gb
-    name: clawdbot
+    name: moltbot
     source_dir: /
