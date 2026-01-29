@@ -23,7 +23,7 @@ ENV MOLTBOT_STATE_DIR=/data/.moltbot \
     S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
     S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
 
-# Install OS deps + Node.js + sshd + Litestream + s3cmd + s6-overlay
+# Install OS deps + Node.js + sshd + Litestream + restic + s6-overlay
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -35,8 +35,7 @@ RUN set -eux; \
       jq \
       sudo \
       git \
-      s3cmd \
-      python3 \
+      bzip2 \
       openssh-server \
       xz-utils; \
     # Install Node.js from NodeSource
@@ -51,6 +50,18 @@ RUN set -eux; \
       https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-${LITESTREAM_ARCH}.deb; \
     dpkg -i /tmp/litestream.deb; \
     rm /tmp/litestream.deb; \
+    # Install restic
+    RESTIC_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo arm64 || echo amd64 )"; \
+    wget -q -O /tmp/restic.bz2 \
+      https://github.com/restic/restic/releases/download/v0.17.3/restic_0.17.3_linux_${RESTIC_ARCH}.bz2; \
+    bunzip2 /tmp/restic.bz2; \
+    mv /tmp/restic /usr/local/bin/restic; \
+    chmod +x /usr/local/bin/restic; \
+    # Install yq for YAML parsing
+    YQ_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo arm64 || echo amd64 )"; \
+    wget -q -O /usr/local/bin/yq \
+      https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_${YQ_ARCH}; \
+    chmod +x /usr/local/bin/yq; \
     # Install s6-overlay
     S6_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo aarch64 || echo x86_64 )"; \
     wget -O /tmp/s6-overlay-noarch.tar.xz \

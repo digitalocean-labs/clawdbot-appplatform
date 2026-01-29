@@ -1,0 +1,78 @@
+#!/command/with-contenv bash
+# Unified backup script using restic
+# Reads configuration from /etc/moltbot/backup.yaml
+
+set -e
+
+CONFIG_FILE="/etc/moltbot/backup.yaml"
+QUIET=""
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --quiet|-q)
+      QUIET=1
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+log() {
+  [ -z "$QUIET" ] && echo "[backup] $1"
+}
+
+# Check if persistence is configured
+if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
+  log "Persistence not configured, skipping backup"
+  exit 0
+fi
+
+# Check if config exists
+if [ ! -f "$CONFIG_FILE" ]; then
+  log "Config file not found: $CONFIG_FILE"
+  exit 1
+fi
+
+# Get number of paths to backup
+PATH_COUNT=$(yq -r '.paths | length' "$CONFIG_FILE")
+
+if [ "$PATH_COUNT" -eq 0 ]; then
+  log "No paths configured for backup"
+  exit 0
+fi
+
+log "Starting backup of $PATH_COUNT paths..."
+
+# Build restic backup command for each path
+for i in $(seq 0 $((PATH_COUNT - 1))); do
+  BACKUP_PATH=$(yq -r ".paths[$i].path" "$CONFIG_FILE")
+  
+  # Skip if path doesn't exist
+  if [ ! -e "$BACKUP_PATH" ]; then
+    log "Path does not exist, skipping: $BACKUP_PATH"
+    continue
+  fi
+  
+  # Build exclude arguments
+  EXCLUDE_ARGS=""
+  EXCLUDE_COUNT=$(yq -r ".paths[$i].exclude | length // 0" "$CONFIG_FILE")
+  
+  for j in $(seq 0 $((EXCLUDE_COUNT - 1))); do
+    PATTERN=$(yq -r ".paths[$i].exclude[$j]" "$CONFIG_FILE")
+    EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$PATTERN"
+  done
+  
+  log "Backing up: $BACKUP_PATH"
+  
+  # Run restic backup
+  if restic backup $EXCLUDE_ARGS "$BACKUP_PATH" 2>&1 | grep -v "^unchanged\|^modified\|^new" || true; then
+    log "Completed: $BACKUP_PATH"
+  else
+    log "Warning: Backup may have had issues for $BACKUP_PATH"
+  fi
+done
+
+log "Backup complete"

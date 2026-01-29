@@ -1,34 +1,20 @@
 #!/command/with-contenv bash
-# Periodic backup service using s3cmd sync
+# Periodic backup service using restic
+
+CONFIG_FILE="/etc/moltbot/backup.yaml"
 
 # Skip if persistence not configured
-if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
+if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
   echo "[backup] Persistence not configured, service disabled"
   s6-svc -Od .
   exit 0
 fi
 
-BACKUP_INTERVAL=${BACKUP_INTERVAL_SECONDS:-300}
+# Read backup interval from config (default 30 seconds)
+BACKUP_INTERVAL=$(yq -r '.backup_interval_seconds // 30' "$CONFIG_FILE")
 echo "[backup] Starting backup loop (every ${BACKUP_INTERVAL}s)..."
-
-S3_PREFIX="s3://${SPACES_BUCKET}/moltbot/rootfs"
 
 while true; do
   sleep "$BACKUP_INTERVAL"
-  
-  echo "[backup] Syncing moltbot state..."
-  s3cmd -c /run/secrets/s3cfg sync --delete-removed --no-preserve \
-    --exclude="memory/*" --exclude="*.sqlite*" --exclude="*.db*" --exclude="gateway.*.lock" \
-    "$MOLTBOT_STATE_DIR/" "${S3_PREFIX}/data/.moltbot/" || true
-
-  echo "[backup] Syncing Tailscale state..."
-  s3cmd -c /run/secrets/s3cfg sync --delete-removed --no-preserve \
-    "$TS_STATE_DIR/" "${S3_PREFIX}/data/tailscale/" || true
-
-  echo "[backup] Syncing home directories..."
-  s3cmd -c /run/secrets/s3cfg sync --delete-removed --no-preserve \
-    --exclude="*/.cache/*" --exclude="*/.npm/_cacache/*" --exclude="*/.local/share/pnpm/store/*" --exclude="*/node_modules/*" \
-    "/home/" "${S3_PREFIX}/home/" || true
-
-  echo "[backup] Sync complete"
+  /usr/local/bin/moltbot-backup
 done

@@ -1,0 +1,60 @@
+#!/command/with-contenv bash
+# Setup restic for DO Spaces backup
+
+CONFIG_FILE="/etc/moltbot/backup.yaml"
+
+# Skip if persistence not configured
+if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
+  echo "[setup-restic] Persistence not configured, skipping"
+  exit 0
+fi
+
+echo "[setup-restic] Configuring restic for DO Spaces..."
+
+# Create s6 container environment directory
+mkdir -p /run/s6/container_environment
+
+# Export AWS credentials for restic S3 backend
+echo "$LITESTREAM_ACCESS_KEY_ID" > /run/s6/container_environment/AWS_ACCESS_KEY_ID
+echo "$LITESTREAM_SECRET_ACCESS_KEY" > /run/s6/container_environment/AWS_SECRET_ACCESS_KEY
+
+# Set restic password (from env or generate a persistent one)
+if [ -z "$RESTIC_PASSWORD" ]; then
+  # Generate a password and store it for future runs
+  if [ -f "$MOLTBOT_STATE_DIR/.restic-password" ]; then
+    RESTIC_PASSWORD=$(cat "$MOLTBOT_STATE_DIR/.restic-password")
+  else
+    RESTIC_PASSWORD=$(openssl rand -base64 32)
+    mkdir -p "$MOLTBOT_STATE_DIR"
+    echo "$RESTIC_PASSWORD" > "$MOLTBOT_STATE_DIR/.restic-password"
+    chmod 600 "$MOLTBOT_STATE_DIR/.restic-password"
+    echo "[setup-restic] Generated new restic password (stored in $MOLTBOT_STATE_DIR/.restic-password)"
+  fi
+fi
+echo "$RESTIC_PASSWORD" > /run/s6/container_environment/RESTIC_PASSWORD
+
+# Build repository URL from config (expand env vars)
+REPO_TEMPLATE=$(yq -r '.repository' "$CONFIG_FILE")
+RESTIC_REPOSITORY=$(eval echo "$REPO_TEMPLATE")
+echo "$RESTIC_REPOSITORY" > /run/s6/container_environment/RESTIC_REPOSITORY
+
+# Export for current script
+export AWS_ACCESS_KEY_ID="$LITESTREAM_ACCESS_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="$LITESTREAM_SECRET_ACCESS_KEY"
+export RESTIC_PASSWORD
+export RESTIC_REPOSITORY
+
+# Initialize restic repo if it doesn't exist
+echo "[setup-restic] Checking if restic repository exists..."
+if restic snapshots 2>/dev/null; then
+  echo "[setup-restic] Restic repository already initialized"
+else
+  echo "[setup-restic] Initializing restic repository..."
+  if restic init; then
+    echo "[setup-restic] Restic repository initialized successfully"
+  else
+    echo "[setup-restic] Warning: Failed to initialize restic repository"
+  fi
+fi
+
+echo "[setup-restic] Restic configured (repository: $RESTIC_REPOSITORY)"

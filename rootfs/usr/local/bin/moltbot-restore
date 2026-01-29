@@ -1,0 +1,73 @@
+#!/command/with-contenv bash
+# Unified restore script using restic
+# Reads configuration from /etc/moltbot/backup.yaml
+
+set -e
+
+CONFIG_FILE="/etc/moltbot/backup.yaml"
+QUIET=""
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --quiet|-q)
+      QUIET=1
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+log() {
+  [ -z "$QUIET" ] && echo "[restore] $1"
+}
+
+# Check if persistence is configured
+if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
+  log "Persistence not configured, skipping restore"
+  exit 0
+fi
+
+# Check if config exists
+if [ ! -f "$CONFIG_FILE" ]; then
+  log "Config file not found: $CONFIG_FILE"
+  exit 1
+fi
+
+# Check if repository has any snapshots
+if ! restic snapshots --latest 1 2>/dev/null | grep -q .; then
+  log "No snapshots found in repository, skipping restore"
+  exit 0
+fi
+
+# Get number of paths to restore
+PATH_COUNT=$(yq -r '.paths | length' "$CONFIG_FILE")
+
+if [ "$PATH_COUNT" -eq 0 ]; then
+  log "No paths configured for restore"
+  exit 0
+fi
+
+log "Starting restore of $PATH_COUNT paths..."
+
+# Restore each path from latest snapshot
+for i in $(seq 0 $((PATH_COUNT - 1))); do
+  RESTORE_PATH=$(yq -r ".paths[$i].path" "$CONFIG_FILE")
+  
+  # Ensure parent directory exists
+  mkdir -p "$(dirname "$RESTORE_PATH")"
+  
+  log "Restoring: $RESTORE_PATH"
+  
+  # Run restic restore with --include to restore only this path
+  # --target / restores to original locations
+  if restic restore latest --target / --include "$RESTORE_PATH" 2>&1; then
+    log "Completed: $RESTORE_PATH"
+  else
+    log "Warning: Restore may have had issues for $RESTORE_PATH (continuing)"
+  fi
+done
+
+log "Restore complete"

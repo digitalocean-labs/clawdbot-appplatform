@@ -1,30 +1,6 @@
 #!/command/with-contenv bash
-# Final backup on container shutdown using s3cmd sync
-
-# Skip if persistence not configured
-if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
-  exit 0
-fi
+# Final backup on container shutdown
 
 echo "[final-backup] Container shutting down, saving state..."
-
-S3_PREFIX="s3://${SPACES_BUCKET}/moltbot/rootfs"
-
-# Backup moltbot state
-echo "[final-backup] Syncing moltbot state..."
-s3cmd -c /run/secrets/s3cfg sync --delete-removed --no-preserve \
-  --exclude="memory/*" --exclude="*.sqlite*" --exclude="*.db*" --exclude="gateway.*.lock" \
-  "$MOLTBOT_STATE_DIR/" "${S3_PREFIX}/data/.moltbot/" || true
-
-# Backup Tailscale state
-echo "[final-backup] Syncing Tailscale state..."
-s3cmd -c /run/secrets/s3cfg sync --delete-removed --no-preserve \
-  "$TS_STATE_DIR/" "${S3_PREFIX}/data/tailscale/" || true
-
-# Backup home directories
-echo "[final-backup] Syncing home directories..."
-s3cmd -c /run/secrets/s3cfg sync --delete-removed --no-preserve \
-  --exclude="*/.cache/*" --exclude="*/.npm/_cacache/*" --exclude="*/.local/share/pnpm/store/*" --exclude="*/node_modules/*" \
-  "/home/" "${S3_PREFIX}/home/" || true
-
+/usr/local/bin/moltbot-backup --quiet
 echo "[final-backup] Complete"

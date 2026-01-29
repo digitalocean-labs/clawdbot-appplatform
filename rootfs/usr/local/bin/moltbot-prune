@@ -1,0 +1,56 @@
+#!/command/with-contenv bash
+# Prune old snapshots using restic forget
+# Reads retention policy from /etc/moltbot/backup.yaml
+
+set -e
+
+CONFIG_FILE="/etc/moltbot/backup.yaml"
+QUIET=""
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --quiet|-q)
+      QUIET=1
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+log() {
+  [ -z "$QUIET" ] && echo "[prune] $1"
+}
+
+# Check if persistence is configured
+if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
+  log "Persistence not configured, skipping prune"
+  exit 0
+fi
+
+# Check if config exists
+if [ ! -f "$CONFIG_FILE" ]; then
+  log "Config file not found: $CONFIG_FILE"
+  exit 1
+fi
+
+# Read retention policy from config
+KEEP_LAST=$(yq -r '.retention.keep_last // 10' "$CONFIG_FILE")
+KEEP_HOURLY=$(yq -r '.retention.keep_hourly // 48' "$CONFIG_FILE")
+KEEP_DAILY=$(yq -r '.retention.keep_daily // 30' "$CONFIG_FILE")
+KEEP_WEEKLY=$(yq -r '.retention.keep_weekly // 8' "$CONFIG_FILE")
+KEEP_MONTHLY=$(yq -r '.retention.keep_monthly // 6' "$CONFIG_FILE")
+
+log "Starting prune with retention: last=$KEEP_LAST hourly=$KEEP_HOURLY daily=$KEEP_DAILY weekly=$KEEP_WEEKLY monthly=$KEEP_MONTHLY"
+
+# Run restic forget with prune
+restic forget --prune \
+  --keep-last "$KEEP_LAST" \
+  --keep-hourly "$KEEP_HOURLY" \
+  --keep-daily "$KEEP_DAILY" \
+  --keep-weekly "$KEEP_WEEKLY" \
+  --keep-monthly "$KEEP_MONTHLY"
+
+log "Prune complete"
