@@ -11,18 +11,12 @@ paths:
   - path: /etc
   - path: /data/.moltbot
     exclude:
-      - "memory/*"
       - "*.sqlite*"
       - "*.db*"
-      - "gateway.*.lock"
+      - "*.lock"
+      - "*.pid"
+      - "*.sock"
 
-  # Include the legacy .clawdbot directory for backwards compatibility
-  - path: /data/.clawdbot
-    exclude:
-      - "memory/*"
-      - "*.sqlite*"
-      - "*.db*"
-      - "gateway.*.lock"
 
   - path: /data/tailscale
 
@@ -32,6 +26,11 @@ paths:
       - "*/.npm/_cacache/*"
       - "*/.local/share/pnpm/store/*"
       - "*/node_modules/*"
+      - "*.sqlite*"
+      - "*.db*"
+      - "*.lock"
+      - "*.pid"
+      - "*.sock"
 
 # Global settings
 backup_interval_seconds: 30
