@@ -16,6 +16,7 @@ if [ -z "$MOLTBOT_GATEWAY_TOKEN" ]; then
   export MOLTBOT_GATEWAY_TOKEN=$(head -c 32 /dev/urandom | base64 | tr -d '=/+' | head -c 32)
   echo "[generate-config] Generated gateway token (ephemeral)"
   # Write to s6 environment so services can access it
+  mkdir -p /run/s6/container_environment
   echo "$MOLTBOT_GATEWAY_TOKEN" > /run/s6/container_environment/MOLTBOT_GATEWAY_TOKEN
 fi
 
