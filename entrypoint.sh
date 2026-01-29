@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Paths
+DEFAULT_CONFIG="/etc/clawdbot/moltbot.default.json"
+CONFIG_FILE="$CLAWDBOT_STATE_DIR/clawdbot.json"
+
 # Ensure directories exist
 mkdir -p "$CLAWDBOT_STATE_DIR" "$CLAWDBOT_WORKSPACE_DIR" "$CLAWDBOT_STATE_DIR/memory"
 
@@ -48,64 +52,68 @@ if [ -z "$CLAWDBOT_GATEWAY_TOKEN" ]; then
   echo "Generated gateway token (ephemeral)"
 fi
 
-# Build config file dynamically based on environment variables
-# This allows flexibility without requiring CLI parameters
-CONFIG_FILE="$CLAWDBOT_STATE_DIR/clawdbot.json"
-
+# Build config by merging mode-specific settings into default config
 echo "Building config: $CONFIG_FILE"
+
+# Start with default config as base
+if [ -f "$DEFAULT_CONFIG" ]; then
+  cp "$DEFAULT_CONFIG" "$CONFIG_FILE"
+  echo "Using default config from $DEFAULT_CONFIG"
+else
+  # Fallback minimal config if default doesn't exist
+  echo '{"gateway": {"mode": "local"}}' > "$CONFIG_FILE"
+  echo "Warning: Default config not found, using minimal config"
+fi
 
 # Determine gateway mode: tailscale (default) or lan
 GATEWAY_MODE="${CLAWDBOT_GATEWAY_MODE:-tailscale}"
 
-# Start with base config
+# Build mode-specific overlay
 if [ "$GATEWAY_MODE" = "tailscale" ]; then
   echo "Gateway mode: Tailscale"
-  cat > "$CONFIG_FILE" << CONFIGEOF
+  MODE_CONFIG=$(cat << 'MODEEOF'
 {
   "gateway": {
-    "mode": "local",
     "bind": "loopback",
     "tailscale": { "mode": "serve" },
     "auth": {
       "allowTailscale": true
-    },
-    "controlUi": {
-      "allowInsecureAuth": true
     }
   }
 }
-CONFIGEOF
+MODEEOF
+)
 else
-  # LAN mode - bind to all interfaces with trusted proxies for App Platform/Cloudflare
+  # LAN mode - bind to all interfaces
   PORT="${PORT:-8080}"
   echo "Gateway mode: LAN (port $PORT)"
   
-  # Determine auth config based on SETUP_PASSWORD
+  # Determine auth mode based on SETUP_PASSWORD
   if [ -n "$SETUP_PASSWORD" ]; then
-    AUTH_CONFIG='"mode": "password"'
+    AUTH_MODE="password"
     echo "Auth: password"
   else
-    AUTH_CONFIG='"mode": "token"'
+    AUTH_MODE="token"
     echo "Auth: token"
   fi
 
-  cat > "$CONFIG_FILE" << CONFIGEOF
+  MODE_CONFIG=$(cat << MODEEOF
 {
   "gateway": {
-    "mode": "local",
     "port": $PORT,
     "bind": "lan",
-    "trustedProxies": ["0.0.0.0/0", "::/0"],
     "auth": {
-      $AUTH_CONFIG
-    },
-    "controlUi": {
-      "allowInsecureAuth": true
+      "mode": "$AUTH_MODE"
     }
   }
 }
-CONFIGEOF
+MODEEOF
+)
 fi
+
+# Merge mode config into base config (deep merge)
+jq --argjson mode "$MODE_CONFIG" '. * $mode' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" \
+  && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 
 # Add Gradient AI provider if API key is set
 if [ -n "$GRADIENT_API_KEY" ]; then
@@ -171,6 +179,9 @@ GRADIENTEOF
      '. * $gradient | .models.providers.gradient.apiKey = $apiKey' \
      "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 fi
+
+echo "Final config:"
+jq '.' "$CONFIG_FILE"
 
 # Backup function for JSON state files
 backup_state() {

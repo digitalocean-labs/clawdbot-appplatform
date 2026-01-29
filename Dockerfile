@@ -39,6 +39,7 @@ RUN set -eux; \
 
 COPY entrypoint.sh /entrypoint.sh
 COPY litestream.yml /etc/litestream.yml
+COPY moltbot.default.json /etc/clawdbot/moltbot.default.json
 RUN chmod +x /entrypoint.sh
 
 # Create non-root user with sudo access (needed for some clawdbot operations)
