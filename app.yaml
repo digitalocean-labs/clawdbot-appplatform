@@ -6,7 +6,7 @@ services:
   - name: clawdbot
     image:
       registry_type: GHCR
-      registry: bikramkgupta
+      registry: digitalocean-labs
       repository: clawdbot-appplatform
       tag: latest
     instance_count: 1
@@ -27,6 +27,9 @@ services:
         value: /data/.clawdbot
       - key: CLAWDBOT_WORKSPACE_DIR
         value: /data/workspace
+      # Gateway mode: lan for public HTTP access
+      - key: CLAWDBOT_GATEWAY_MODE
+        value: lan
       # Recommended
       - key: CLAWDBOT_GATEWAY_TOKEN
         scope: RUN_TIME
@@ -40,9 +43,10 @@ services:
       #   scope: RUN_TIME
       #   type: SECRET
       # - key: SPACES_ENDPOINT
-      #   scope: RUN_TIME
-      #   type: SECRET
-      #   # e.g., tor1.digitaloceanspaces.com
+      #   value: tor1.digitaloceanspaces.com
       # - key: SPACES_BUCKET
+      #   value: clawdbot-backup
+      # Optional: Gradient AI
+      # - key: GRADIENT_API_KEY
       #   scope: RUN_TIME
       #   type: SECRET
