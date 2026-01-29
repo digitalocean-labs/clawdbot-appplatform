@@ -29,25 +29,6 @@ else
   echo "[generate-config] Warning: Default config not found, using minimal config"
 fi
 
-# Tailscale gateway configuration
-echo "[generate-config] Gateway mode: Tailscale"
-MODE_CONFIG=$(cat << 'MODEEOF'
-{
-  "gateway": {
-    "bind": "loopback",
-    "tailscale": { "mode": "serve" },
-    "auth": {
-      "allowTailscale": true
-    }
-  }
-}
-MODEEOF
-)
-
-# Merge mode config into base config (deep merge)
-jq --argjson mode "$MODE_CONFIG" '. * $mode' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" \
-  && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
-
 # Add Gradient AI provider if API key is set
 if [ -n "$GRADIENT_API_KEY" ]; then
   echo "[generate-config] Adding Gradient AI provider to config"

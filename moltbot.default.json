@@ -1,8 +1,15 @@
 {
   "gateway": {
     "mode": "local",
+    "bind": "loopback",
     "controlUi": {
       "allowInsecureAuth": true
+    },
+    "tailscale": {
+      "mode": "serve"
+    },
+    "auth": {
+      "allowTailscale": true
     }
   }
 }
