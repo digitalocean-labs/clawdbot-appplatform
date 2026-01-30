@@ -69,6 +69,7 @@ RUN set -eux; \
     mv /tmp/restic /usr/local/bin/restic; \
     chmod +x /usr/local/bin/restic; \
     # Install ngrok
+    mkdir -p /etc/apt/keyrings; \
     curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
       | gpg --dearmor -o /etc/apt/keyrings/ngrok.gpg; \
     echo "deb [signed-by=/etc/apt/keyrings/ngrok.gpg] https://ngrok-agent.s3.amazonaws.com buster main" \

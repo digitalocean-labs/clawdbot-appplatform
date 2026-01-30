@@ -3,14 +3,14 @@ region: tor  # Available: nyc, ams, sfo, sgp, lon, fra, blr, syd, tor
 
 workers:
   - name: moltbot
-    # Deploy from pre-built GHCR image (faster than building from source)
-    image:
-      registry_type: GHCR
-      registry: ghcr.io
-      repository: digitalocean-labs/clawdbot-appplatform
-      tag: latest
+    dockerfile_path: /Dockerfile
+    source_dir: /
     instance_count: 1
-    instance_size_slug: apps-s-1vcpu-1gb  # Minimum 1GB to avoid heap overflow
+    instance_size_slug: apps-s-2vcpu-4gb
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: digitalocean-labs/clawdbot-appplatform
     envs:
       # ============================================================
       # REQUIRED
