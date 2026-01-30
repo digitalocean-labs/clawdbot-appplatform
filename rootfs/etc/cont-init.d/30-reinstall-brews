@@ -1,5 +1,12 @@
 #!/command/with-contenv bash
-# Reinstall Brews for all users (only when persistence is enabled)
+# Reinstall Brews for all users (only when persistence is enabled AND Homebrew is installed)
+
+# Skip if Homebrew is not installed
+# Homebrew is optional in this image to reduce size (~1.5GB savings)
+if [ ! -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+  echo "[reinstall-brews] Homebrew not installed, skipping"
+  exit 0
+fi
 
 # Skip if persistence is not configured
 if [ "${ENABLE_SPACES:-false}" != "true" ]; then

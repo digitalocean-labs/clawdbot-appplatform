@@ -114,8 +114,27 @@ RUN mkdir -p ${PNPM_HOME} && chown -R moltbot:moltbot /home/moltbot/.local
 
 USER moltbot
 
-# Install Homebrew (Linuxbrew) - must be done as non-root user
-RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
+# =============================================================================
+# HOMEBREW (LINUXBREW) - TEMPORARILY DISABLED
+# =============================================================================
+# Homebrew installation is commented out to reduce image size from ~2.5GB to ~1GB.
+#
+# Why disabled:
+# - Docker builds were failing both locally (ARM64 emulation timeout) and in
+#   GitHub Actions (exceeded 30-minute timeout during Homebrew installation)
+# - Homebrew adds ~1.5GB to the final image size
+# - Most users don't need runtime package installation via brew
+#
+# Impact:
+# - Users cannot run `brew install <package>` at runtime
+# - The 30-reinstall-brews init script will skip gracefully (no errors)
+# - All core functionality (moltbot, Tailscale, Spaces persistence) works normally
+#
+# To re-enable Homebrew, uncomment the following line:
+# RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
+#
+# TODO: Re-enable Homebrew in a future release with optimized build process
+# =============================================================================
 
 # Install nvm, Node.js LTS, pnpm, and moltbot
 RUN export SHELL=/bin/bash  && export NVM_DIR="$HOME/.nvm" \
