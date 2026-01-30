@@ -1,5 +1,5 @@
 #!/command/with-contenv bash
-# Import SSH keys from GitHub
+# Import SSH keys from GitHub and/or SSH_AUTHORIZED_USERS
 
 # Skip if no GitHub username configured
 if [ -z "$GITHUB_USERNAME" ]; then
@@ -7,6 +7,27 @@ if [ -z "$GITHUB_USERNAME" ]; then
   exit 0
 fi
 
-# Import SSH keys for ubuntu user
-echo "[ssh-import] Importing SSH keys for $GITHUB_USERNAME"
-su - ubuntu -c "ssh-import-id gh:$GITHUB_USERNAME" || echo "[ssh-import] Warning: failed to import keys"
+# Import SSH keys from GitHub if configured
+if [ -n "$GITHUB_USERNAME" ]; then
+  echo "[ssh-import] Importing SSH keys for $GITHUB_USERNAME"
+  su - ubuntu -c "ssh-import-id gh:$GITHUB_USERNAME" || echo "[ssh-import] Warning: failed to import keys"
+fi
+
+# Add SSH keys from SSH_AUTHORIZED_USERS if configured
+if [ -n "$SSH_AUTHORIZED_USERS" ]; then
+  echo "[ssh-import] Adding SSH keys from SSH_AUTHORIZED_USERS"
+  # Process each line (SSH keys are typically one per line)
+  echo "$SSH_AUTHORIZED_USERS" | while IFS= read -r line || [ -n "$line" ]; do
+    # Trim whitespace
+    line=$(echo "$line" | xargs)
+    # Skip empty lines
+    [ -z "$line" ] && continue
+    # Check if line looks like an SSH key (starts with ssh-rsa, ssh-ed25519, etc.)
+    if echo "$line" | grep -qE "^ssh-(rsa|dss|ed25519|ecdsa)"; then
+      echo "$line" >> /home/ubuntu/.ssh/authorized_keys
+      echo "[ssh-import] Added SSH key: ${line:0:50}..."
+    else
+      echo "[ssh-import] Warning: Skipping invalid SSH key format: ${line:0:50}..."
+    fi
+  done
+fi
