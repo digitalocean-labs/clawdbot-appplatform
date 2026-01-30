@@ -1,5 +1,11 @@
 #!/command/with-contenv bash
-# Reinstall Brews for all users
+# Reinstall Brews for all users (only when persistence is enabled)
+
+# Skip if persistence is not configured
+if [ "${ENABLE_SPACES:-false}" != "true" ]; then
+  echo "[reinstall-brews] Persistence not configured, skipping"
+  exit 0
+fi
 
 echo "[reinstall-brews] Reinstalling Brews from restic backup"
 
@@ -7,12 +13,21 @@ echo "[reinstall-brews] Reinstalling Brews from restic backup"
 for homedir in /home/*; do
   # Skip if not a directory
   [ ! -d "$homedir" ] && continue
-  
+
   # Get username from path
   username=$(basename "$homedir")
-  
+
   # Skip if user doesn't exist
   id "$username" >/dev/null 2>&1 || continue
+
+  # Get list of installed brews
+  brew_list=$(sudo -u "$username" bash -lc "brew list 2>/dev/null" || true)
+
+  # Skip if no brews installed
+  if [ -z "$brew_list" ]; then
+    echo "[reinstall-brews] No brews installed for $username, skipping"
+    continue
+  fi
 
   echo "[reinstall-brews] Reinstalling Brews for $username"
   sudo -u "$username" bash -lc "brew reinstall \$(brew list)" || echo "[reinstall-brews] Warning: failed to restore Brews"

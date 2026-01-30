@@ -8,7 +8,7 @@ Deploy [Moltbot](https://github.com/moltbot/moltbot) - a multi-channel AI messag
 
 | Stage | What You Get | Cost | Access Method |
 |-------|--------------|------|---------------|
-| **1. CLI Only** | Gateway + CLI | ~$5/mo | `doctl apps console` |
+| **1. CLI Only** | Gateway + CLI | ~$12/mo | `doctl apps console` |
 | **2. + Web UI + ngrok** | Control UI + Public URL | ~$12/mo | ngrok URL |
 | **3. + Tailscale** | Private Network | ~$25/mo | Tailscale hostname |
 | **+ Persistence** | Data survives restarts | existing subscription | DO Spaces |
@@ -63,7 +63,7 @@ git clone https://github.com/digitalocean-labs/moltbot-appplatform
 cd moltbot-appplatform
 
 # Edit app.yaml - set instance size for Stage 1
-# instance_size_slug: basic-xxs
+# instance_size_slug: basic-xs  # 1 CPU, 1GB (minimum for stable operation)
 
 # Set your SETUP_PASSWORD in app.yaml or DO dashboard
 
