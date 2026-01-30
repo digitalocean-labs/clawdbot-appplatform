@@ -22,10 +22,6 @@ paths:
 
   - path: /home
     exclude:
-      - "*/.cache/*"
-      - "*/.npm/_cacache/*"
-      - "*/.local/share/pnpm/store/*"
-      - "*/node_modules/*"
       - "*.sqlite*"
       - "*.db*"
       - "*.lock"
