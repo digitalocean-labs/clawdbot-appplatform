@@ -1,0 +1,5 @@
+#!/bin/bash
+# Use bash -l to get a login shell which sources .profile
+# This ensures nvm and pnpm PATH are set up
+# Pass all arguments to moltbot
+exec sudo -u moltbot bash -l -c 'exec moltbot "$@"' _ "$@"
