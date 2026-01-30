@@ -20,6 +20,9 @@ spec:
         - key: SETUP_PASSWORD
           scope: RUN_TIME
           type: SECRET
+        - key: STABLE_HOSTNAME
+          scope: RUN_TIME
+          value: moltbot
 
         # Feature flags
         - key: ENABLE_NGROK
@@ -44,15 +47,6 @@ spec:
         - key: TS_AUTHKEY
           scope: RUN_TIME
           type: SECRET
-        - key: TS_HOSTNAME
-          scope: RUN_TIME
-          value: moltbot
-        - key: TS_USERSPACE
-          scope: RUN_TIME
-          value: "true"
-        - key: TS_SOCKET
-          scope: RUN_TIME
-          value: /tmp/tailscaled.sock
 
         # Spaces config
         - key: LITESTREAM_ACCESS_KEY_ID

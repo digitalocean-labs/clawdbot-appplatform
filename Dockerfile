@@ -25,7 +25,6 @@ ARG MOLTBOT_WORKSPACE_DIR=/data/workspace
 
 ENV MOLTBOT_STATE_DIR=${MOLTBOT_STATE_DIR}
 ENV MOLTBOT_WORKSPACE_DIR ${MOLTBOT_WORKSPACE_DIR}
-ENV TS_STATE_DIR /data/tailscale
 ENV NODE_ENV production
 ENV DEBIAN_FRONTEND noninteractive
 ENV S6_KEEP_ENV 1
@@ -100,7 +99,7 @@ COPY rootfs/ /
 
 # Create non-root user (using existing home directory from rootfs)
 RUN useradd -d /home/moltbot -s /bin/bash moltbot \
-    && mkdir -p "${MOLTBOT_STATE_DIR}" "${MOLTBOT_WORKSPACE_DIR}" "${TS_STATE_DIR}" \
+    && mkdir -p "${MOLTBOT_STATE_DIR}" "${MOLTBOT_WORKSPACE_DIR}" \
     && ln -s ${MOLTBOT_STATE_DIR} /home/moltbot/.clawdbot \
     && chown -R moltbot:moltbot /data \
     && chown -R moltbot:moltbot /home/moltbot

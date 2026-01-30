@@ -7,6 +7,11 @@ if [ "${ENABLE_TAILSCALE:-false}" != "true" ]; then
   exit 0
 fi
 
+# Source s6 container environment (ensures vars are available)
+for f in /run/s6/container_environment/*; do
+  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
+done
+
 if [ -z "$TS_AUTHKEY" ]; then
   echo "[tailscale] ERROR: ENABLE_TAILSCALE=true but TS_AUTHKEY not set" >&2
   s6-svc -Od .

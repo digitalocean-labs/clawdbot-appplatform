@@ -18,6 +18,9 @@ workers:
       - key: SETUP_PASSWORD
         scope: RUN_TIME
         type: SECRET
+      - key: STABLE_HOSTNAME
+        scope: RUN_TIME
+        value: moltbot
 
       # ============================================================
       # FEATURE FLAGS
@@ -54,15 +57,7 @@ workers:
       - key: TS_AUTHKEY
         scope: RUN_TIME
         type: SECRET
-      - key: TS_HOSTNAME
-        scope: RUN_TIME
-        value: moltbot
-      - key: TS_USERSPACE
-        scope: RUN_TIME
-        value: "true"
-      - key: TS_SOCKET
-        scope: RUN_TIME
-        value: /tmp/tailscaled.sock
+   
 
       # ============================================================
       # SPACES - Data Persistence

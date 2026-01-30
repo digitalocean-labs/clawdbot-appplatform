@@ -164,7 +164,7 @@ envs:
     value: "true"
   - key: TS_AUTHKEY
     type: SECRET
-  - key: TS_HOSTNAME
+  - key: STABLE_HOSTNAME
     value: moltbot
 ```
 
@@ -278,6 +278,7 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 | Variable | Description |
 |----------|-------------|
 | `SETUP_PASSWORD` | Password for web setup wizard |
+|`STABLE_HOSTNAME` | A stable hostname for this instance|
 
 ### Feature Flags
 
@@ -300,7 +301,6 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 | Variable | Description |
 |----------|-------------|
 | `TS_AUTHKEY` | Tailscale auth key |
-| `TS_HOSTNAME` | Hostname on your tailnet |
 
 ### Spaces (when ENABLE_SPACES=true)
 
