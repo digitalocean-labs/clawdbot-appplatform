@@ -1,0 +1,21 @@
+#!/command/with-contenv bash
+# Reinstall Brews for all users
+
+echo "[reinstall-brews] Reinstalling Brews from restic backup"
+
+# Iterate through all home directories in /home
+for homedir in /home/*; do
+  # Skip if not a directory
+  [ ! -d "$homedir" ] && continue
+  
+  # Get username from path
+  username=$(basename "$homedir")
+  
+  # Skip if user doesn't exist
+  id "$username" >/dev/null 2>&1 || continue
+
+  echo "[reinstall-brews] Reinstalling Brews for $username"
+  sudo -u "$username" bash -lc "brew reinstall \$(brew list)" || echo "[reinstall-brews] Warning: failed to restore Brews"
+done
+
+echo "[reinstall-brews] Reinstall complete"
