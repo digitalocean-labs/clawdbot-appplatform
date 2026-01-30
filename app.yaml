@@ -6,7 +6,7 @@ workers:
     dockerfile_path: /Dockerfile
     source_dir: /
     instance_count: 1
-    instance_size_slug: apps-s-1vcpu-2gb  # Minimum 2GB required - 1GB causes heap overflow
+    instance_size_slug: apps-d-2vcpu-4gb  # Minimum 2GB required - 1GB causes heap overflow
     github:
       branch: main
       deploy_on_push: true
@@ -34,7 +34,7 @@ workers:
         value: "false"
       - key: ENABLE_UI
         scope: RUN_TIME
-        value: "true"
+        value: "false"
 
       # ============================================================
       # NGROK - Public Tunnel Access
