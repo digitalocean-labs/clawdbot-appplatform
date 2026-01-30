@@ -54,7 +54,6 @@ log "Starting prune with retention: last=$KEEP_LAST hourly=$KEEP_HOURLY daily=$K
 log "Pruning snapshots for host: $RESTIC_HOST"
 
 restic forget --prune \
-  --host "$RESTIC_HOST" \
   --keep-last "$KEEP_LAST" \
   --keep-hourly "$KEEP_HOURLY" \
   --keep-daily "$KEEP_DAILY" \
