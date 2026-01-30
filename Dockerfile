@@ -2,6 +2,9 @@ FROM tailscale/tailscale:stable AS tailscale
 
 FROM ubuntu:noble
 
+# Use bash for the shell
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Copy Tailscale binaries
 # real_tailscale is used because the rootfs/usr/local/bin/tailscale script is a wrapper that injects the socket path for tailscale CLI
 COPY --from=tailscale /usr/local/bin/tailscale /usr/local/bin/real_tailscale
@@ -13,15 +16,20 @@ ARG MOLTBOT_VERSION=2026.1.27-beta.1
 ARG LITESTREAM_VERSION=0.5.6
 ARG S6_OVERLAY_VERSION=3.2.1.0
 ARG NODE_MAJOR=24
+ARG RESTIC_VERSION=0.17.3
+ARG YQ_VERSION=4.44.3
+ARG NVM_VERSION=0.40.4
+ARG MOLTBOT_STATE_DIR=/data/.moltbot
+ARG MOLTBOT_WORKSPACE_DIR=/data/workspace
 
-ENV MOLTBOT_STATE_DIR=/data/.moltbot \
-    MOLTBOT_WORKSPACE_DIR=/data/workspace \
-    TS_STATE_DIR=/data/tailscale \
-    NODE_ENV=production \
-    DEBIAN_FRONTEND=noninteractive \
-    S6_KEEP_ENV=1 \
-    S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
-    S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
+ENV MOLTBOT_STATE_DIR=${MOLTBOT_STATE_DIR}
+ENV MOLTBOT_WORKSPACE_DIR ${MOLTBOT_WORKSPACE_DIR}
+ENV TS_STATE_DIR /data/tailscale
+ENV NODE_ENV production
+ENV DEBIAN_FRONTEND noninteractive
+ENV S6_KEEP_ENV 1
+ENV S6_BEHAVIOUR_IF_STAGE2_FAILS 2
+ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME 0
 
 # Install OS deps + Node.js + sshd + Litestream + restic + s6-overlay
 RUN set -eux; \
@@ -30,6 +38,8 @@ RUN set -eux; \
       ca-certificates \
       wget \
       curl \
+      git \
+      gh \
       gnupg \
       ssh-import-id \
       openssl \
@@ -39,13 +49,9 @@ RUN set -eux; \
       bzip2 \
       openssh-server \
       cron \
+      build-essential \
+      procps \
       xz-utils; \
-    # Install Node.js from NodeSource
-    mkdir -p /etc/apt/keyrings; \
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg; \
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_${NODE_MAJOR}.x nodistro main" > /etc/apt/sources.list.d/nodesource.list; \
-    apt-get update; \
-    apt-get install -y nodejs; \
     # Install Litestream
     LITESTREAM_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo arm64 || echo x86_64 )"; \
     wget -O /tmp/litestream.deb \
@@ -55,14 +61,14 @@ RUN set -eux; \
     # Install restic
     RESTIC_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo arm64 || echo amd64 )"; \
     wget -q -O /tmp/restic.bz2 \
-      https://github.com/restic/restic/releases/download/v0.17.3/restic_0.17.3_linux_${RESTIC_ARCH}.bz2; \
+      https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/restic_${RESTIC_VERSION}_linux_${RESTIC_ARCH}.bz2; \
     bunzip2 /tmp/restic.bz2; \
     mv /tmp/restic /usr/local/bin/restic; \
     chmod +x /usr/local/bin/restic; \
     # Install yq for YAML parsing
     YQ_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo arm64 || echo amd64 )"; \
     wget -q -O /usr/local/bin/yq \
-      https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_${YQ_ARCH}; \
+      https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_${YQ_ARCH}; \
     chmod +x /usr/local/bin/yq; \
     # Install s6-overlay
     S6_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo aarch64 || echo x86_64 )"; \
@@ -79,26 +85,27 @@ RUN set -eux; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*
 
-# Create non-root user with sudo access and SSH capability
-RUN useradd -m -d /home/moltbot -s /bin/bash moltbot \
+# Apply rootfs overlay early - allows user creation to use existing home directories
+COPY rootfs/ /
+
+# Create non-root user (using existing home directory from rootfs)
+RUN useradd -d /home/moltbot -s /bin/bash moltbot \
     && mkdir -p "${MOLTBOT_STATE_DIR}" "${MOLTBOT_WORKSPACE_DIR}" "${TS_STATE_DIR}" \
     && chown -R moltbot:moltbot /data \
-    && echo 'moltbot ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/moltbot \
-    && chmod 440 /etc/sudoers.d/moltbot \
-    && mkdir -p /home/moltbot/.ssh \
-    && chmod 700 /home/moltbot/.ssh \
-    && chown moltbot:moltbot /home/moltbot/.ssh \
-    # Setup ubuntu user for SSH
-    && echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ubuntu \
-    && chmod 440 /etc/sudoers.d/ubuntu \
-    && mkdir -p /home/ubuntu/.ssh \
-    && chmod 700 /home/ubuntu/.ssh \
-    && chown ubuntu:ubuntu /home/ubuntu/.ssh
+    && chown -R moltbot:moltbot /home/moltbot
 
-# Create pnpm directory
-RUN mkdir -p /home/moltbot/.local/share/pnpm && chown -R moltbot:moltbot /home/moltbot/.local
+# nvm and pnpm paths
+ENV NVM_DIR="/home/moltbot/.nvm"
+ENV PNPM_HOME="/home/moltbot/.local/share/pnpm"
+ENV PATH="${PNPM_HOME}:${PATH}"
+
+# Create directories
+RUN mkdir -p ${PNPM_HOME} && chown -R moltbot:moltbot /home/moltbot/.local
 
 USER moltbot
+
+# Install Homebrew (Linuxbrew) - must be done as non-root user
+RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
 
 # Install nvm, Node.js LTS, pnpm, and moltbot
 RUN export SHELL=/bin/bash  && export NVM_DIR="$HOME/.nvm" \
@@ -113,16 +120,11 @@ RUN export SHELL=/bin/bash  && export NVM_DIR="$HOME/.nvm" \
     && export PATH="$PNPM_HOME:$PATH" \
     && pnpm add -g "moltbot@${MOLTBOT_VERSION}"
 
-# Switch back to root for final overlay
+# Switch back to root for final setup
 USER root
 
-# Apply rootfs overlay - allows users to add/override any files
-# This is done last so user customizations take precedence
-COPY rootfs/ /
-
-# Fix ownership for any files copied to moltbot's home
-RUN chown -R moltbot:moltbot /home/moltbot
-RUN chown -R ubuntu:ubuntu /home/ubuntu
+# Fix ownership for any files in home directories (in case ubuntu user exists)
+RUN if [ -d /home/ubuntu ]; then chown -R ubuntu:ubuntu /home/ubuntu; fi
 
 # Generate initial package selections list (for restore capability)
 RUN dpkg --get-selections > /etc/moltbot/dpkg-selections

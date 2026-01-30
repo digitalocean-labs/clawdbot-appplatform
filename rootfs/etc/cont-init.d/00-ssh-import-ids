@@ -1,11 +1,10 @@
 #!/command/with-contenv bash
 # Import SSH keys from GitHub and/or SSH_AUTHORIZED_USERS
 
-# Skip if no GitHub username configured
-if [ -z "$GITHUB_USERNAME" ]; then
-  echo "[ssh-import] No GITHUB_USERNAME set, skipping"
-  exit 0
-fi
+# Ensure .ssh directory exists for ubuntu user (01-setup-ssh-dirs should have created it, but ensure it exists)
+mkdir -p /home/ubuntu/.ssh
+chmod 700 /home/ubuntu/.ssh
+chown ubuntu:ubuntu /home/ubuntu/.ssh
 
 # Import SSH keys from GitHub if configured
 if [ -n "$GITHUB_USERNAME" ]; then

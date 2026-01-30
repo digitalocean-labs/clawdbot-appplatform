@@ -10,3 +10,5 @@
 
 
 To get a shell as the moltbot user, use `sudo -i -u moltbot bash`
+
+You can use `marbot` cli directly from here.

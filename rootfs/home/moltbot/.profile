@@ -2,9 +2,10 @@
 [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"
 [ -f "$HOME/.zshrc" ] && . "$HOME/.zshrc"
 
-# Load nvm
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+# Load Homebrew
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" 2>/dev/null || true
+
+# nvm is loaded via NVM_DIR in service scripts (see /etc/services.d/moltbot/run)
 
 # Setup pnpm PATH
 export PNPM_HOME="$HOME/.local/share/pnpm"

@@ -3,8 +3,21 @@
 
 set -e
 
+# Set HOME to moltbot's home so .profile uses correct paths
+export HOME=/home/moltbot
+
 # Source moltbot profile for PATH setup
 . /home/moltbot/.profile
+
+# Load nvm (needed for moltbot command)
+export NVM_DIR="/home/moltbot/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  . "$NVM_DIR/nvm.sh"
+  echo "[generate-config] nvm loaded successfully"
+else
+  echo "[generate-config] ERROR: nvm.sh not found at $NVM_DIR/nvm.sh" >&2
+  exit 1
+fi
 
 # Ensure state directory exists with correct ownership
 mkdir -p "$MOLTBOT_STATE_DIR"
@@ -16,6 +29,13 @@ CONFIG_FILE="$MOLTBOT_STATE_DIR/moltbot.json"
 echo "[generate-config] Building config: $CONFIG_FILE"
 
 # Show version
+echo "[generate-config] Checking moltbot installation..."
+if ! command -v moltbot >/dev/null 2>&1; then
+  echo "[generate-config] ERROR: moltbot command not found in PATH" >&2
+  echo "[generate-config] PATH: $PATH" >&2
+  echo "[generate-config] Node version: $(node --version 2>&1 || echo 'not found')" >&2
+  exit 1
+fi
 echo "[generate-config] Moltbot version: $(moltbot --version 2>/dev/null || echo 'unknown')"
 
 # Generate a gateway token if not provided

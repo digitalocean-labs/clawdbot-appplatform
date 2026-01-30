@@ -18,7 +18,7 @@ done
 
 # Insert --socket as the first argument if not present
 if [ "$SOCKET_PRESENT" = false ]; then
-	SOCKET_ARG="--socket=${TS_SOCKET:-/tmp/tailscale.sock}"
+	SOCKET_ARG="--socket=${TS_SOCKET:-/tmp/tailscaled.sock}"
 	ARGS=("$SOCKET_ARG" "${ARGS[@]}")
 fi
 
