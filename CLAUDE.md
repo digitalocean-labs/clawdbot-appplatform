@@ -57,3 +57,6 @@ Optional DO Spaces backup via Litestream + s3cmd:
 - SQLite: real-time replication via Litestream
 - JSON state: periodic backup every 5 minutes
 - Tailscale state: periodic backup every 5 minutes
+
+## Development
+It's a general rule, do not push code change and then trigger a deployment when trying to develop. It's always better to make the code changes inside the container and then restart the MoltBot service. That way we can iterate really fast. 
