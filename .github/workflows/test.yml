@@ -31,19 +31,20 @@ jobs:
       - name: Build and start container
         run: ./rebuild.sh
 
+      - name: Wait for services
+        run: sleep 10
+
+      - name: Dump container status
+        if: always()
+        run: docker ps -a --filter name=moltbot-test
+
+      - name: Dump container logs
+        if: always()
+        run: docker logs moltbot-test 2>&1 || true
+
       - name: Dump process list
-        run: |
-          echo "Waiting for services to start..."
-          sleep 10
-
-          echo "=== Container Status ==="
-          docker ps -a --filter name=moltbot-test
-
-          echo "=== Container Logs ==="
-          docker logs moltbot-test
-
-          echo "=== Process List ==="
-          docker exec moltbot-test ps aux || echo "Container not running, skipping process list"
+        if: always()
+        run: docker exec moltbot-test ps aux || echo "Container not running"
 
       - name: Cleanup
         if: always()
