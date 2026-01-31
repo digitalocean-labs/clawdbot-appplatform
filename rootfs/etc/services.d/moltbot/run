@@ -6,8 +6,8 @@ echo "[moltbot] Starting moltbot gateway..."
 # Run as moltbot user with proper environment
 export HOME=/home/moltbot
 exec s6-setuidgid moltbot bash -c '
+  export HOME=/home/moltbot
   source /home/moltbot/.bashrc
   source /home/moltbot/.profile
-  export GRADIENT_API_KEY="${GRADIENT_API_KEY:-ChangeMe}"
-  exec moltbot gateway --allow-unconfigured
-'
+  moltbot gateway --allow-unconfigured
+' > /proc/1/fd/1 2>&1
