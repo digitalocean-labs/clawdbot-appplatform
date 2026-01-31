@@ -1,0 +1,8 @@
+services:
+  moltbot-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: ${PLATFORM:-linux/amd64}
+    container_name: ${CONTAINER_NAME:-moltbot-test}
+    env_file: .env

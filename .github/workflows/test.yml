@@ -31,7 +31,7 @@ jobs:
           EOF
 
       - name: Build and start container
-        run: ./rebuild.sh
+        run: make rebuild
 
       - name: Wait for services
         run: sleep 10
@@ -57,4 +57,4 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker rm -f moltbot-test || true
+        run: docker compose down || true
