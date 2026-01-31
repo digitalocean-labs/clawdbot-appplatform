@@ -54,11 +54,4 @@ chmod 0700 "$TS_STATE_DIR" || {
     exit 1
 }
 
-# Set umask to 0077 for the state directory so that the files are created with the correct permissions
-umask 0077 "$TS_STATE_DIR" || {
-  echo "[tailscale] Warning: Failed to set umask for $TS_STATE_DIR" >&2
-    exit 1
-}
-
-
 echo "[tailscale] Setup complete"

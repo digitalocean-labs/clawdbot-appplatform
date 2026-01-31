@@ -209,7 +209,7 @@ envs:
     value: "true"
   - key: RESTIC_SPACES_ACCESS_KEY_ID
     type: SECRET
-  - key: RESTIC_SPACES_ACCESS_KEY_ID
+  - key: RESTIC_SPACES_SECRET_ACCESS_KEY
     type: SECRET
   - key: RESTIC_SPACES_ENDPOINT
     value: tor1.digitaloceanspaces.com  # Match your region
@@ -330,7 +330,7 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 | Variable | Description |
 |----------|-------------|
 | `RESTIC_SPACES_ACCESS_KEY_ID` | Spaces access key |
-| `RESTIC_SPACES_ACCESS_KEY_ID` | Spaces secret key |
+| `RESTIC_SPACES_SECRET_ACCESS_KEY` | Spaces secret key |
 | `RESTIC_SPACES_ENDPOINT` | e.g., `tor1.digitaloceanspaces.com` |
 | `RESTIC_SPACES_BUCKET` | Your bucket name |
 | `RESTIC_PASSWORD` | Backup encryption password |

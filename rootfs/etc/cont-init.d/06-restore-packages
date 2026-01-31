@@ -23,7 +23,7 @@ fi
 export RESTIC_SPACES_ACCESS_KEY_ID RESTIC_SPACES_SECRET_ACCESS_KEY RESTIC_REPOSITORY RESTIC_PASSWORD
 
 # Check if repository has any snapshots
-if ! restic snapshots latest 1 2>/dev/null | grep -q .; then
+if ! restic snapshots --latest 1 2>/dev/null | grep -q .; then
   echo "[restore-packages] No snapshots found, skipping"
   exit 0
 fi

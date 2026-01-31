@@ -67,7 +67,7 @@ workers:
       - key: RESTIC_SPACES_ACCESS_KEY_ID
         scope: RUN_TIME
         type: SECRET
-      - key: RESTIC_SPACES_ACCESS_KEY_ID
+      - key: RESTIC_SPACES_SECRET_ACCESS_KEY
         scope: RUN_TIME
         type: SECRET
       - key: RESTIC_SPACES_ENDPOINT
