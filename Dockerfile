@@ -13,7 +13,6 @@ COPY --from=tailscale /usr/local/bin/containerboot /usr/local/bin/containerboot
 
 ARG TARGETARCH=amd64
 ARG MOLTBOT_VERSION=2026.1.27-beta.1
-ARG LITESTREAM_VERSION=0.5.6
 ARG S6_OVERLAY_VERSION=3.2.1.0
 ARG NODE_MAJOR=24
 ARG RESTIC_VERSION=0.17.3
@@ -31,7 +30,7 @@ ENV S6_KEEP_ENV 1
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS 2
 ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME 0
 
-# Install OS deps + Node.js + sshd + Litestream + restic + s6-overlay
+# Install OS deps + Node.js + sshd + restic + s6-overlay
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -54,12 +53,6 @@ RUN set -eux; \
       build-essential \
       procps \
       xz-utils; \
-    # Install Litestream
-    LITESTREAM_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo arm64 || echo x86_64 )"; \
-    wget -O /tmp/litestream.deb \
-      https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-${LITESTREAM_ARCH}.deb; \
-    dpkg -i /tmp/litestream.deb; \
-    rm /tmp/litestream.deb; \
     # Install restic
     RESTIC_ARCH="$( [ "$TARGETARCH" = "arm64" ] && echo arm64 || echo amd64 )"; \
     wget -q -O /tmp/restic.bz2 \

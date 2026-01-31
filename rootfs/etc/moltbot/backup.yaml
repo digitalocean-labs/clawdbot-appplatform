@@ -11,8 +11,6 @@ paths:
   - path: /root
   - path: /data/.moltbot
     exclude:
-      - "*.sqlite*"
-      - "*.db*"
       - "*.lock"
       - "*.pid"
       - "*.sock"
@@ -22,8 +20,6 @@ paths:
 
   - path: /home
     exclude:
-      - "*.sqlite*"
-      - "*.db*"
       - "*.lock"
       - "*.pid"
       - "*.sock"

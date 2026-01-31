@@ -64,10 +64,10 @@ workers:
       # Set ENABLE_SPACES=true and configure your Spaces bucket
       # Create bucket: https://cloud.digitalocean.com/spaces
       # ============================================================
-      - key: LITESTREAM_ACCESS_KEY_ID
+      - key: AWS_ACCESS_KEY_ID
         scope: RUN_TIME
         type: SECRET
-      - key: LITESTREAM_SECRET_ACCESS_KEY
+      - key: AWS_ACCESS_KEY_ID
         scope: RUN_TIME
         type: SECRET
       - key: SPACES_ENDPOINT

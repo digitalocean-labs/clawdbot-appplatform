@@ -17,6 +17,13 @@ if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
   exit 0
 fi
 
+# Ensure AWS credentials are exported for restic S3 backend
+if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+  echo "[restore-state] ERROR: AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY not set"
+  exit 1
+fi
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY RESTIC_REPOSITORY RESTIC_PASSWORD
+
 # Check if config exists
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "[restore-state] Config file not found: $CONFIG_FILE"
@@ -58,6 +65,13 @@ done
 # Fix ownership on moltbot directories (restored as root, needs moltbot user)
 if [ -d "$MOLTBOT_STATE_DIR" ]; then
   chown -R moltbot:moltbot "$MOLTBOT_STATE_DIR"
+fi
+
+# Fix ownership on tailscale directory (restored as root/tailscale, needs moltbot user)
+# The Tailscale service runs as moltbot user, so it needs write access
+if [ -d "$TS_STATE_DIR" ]; then
+  chown -R moltbot:moltbot "$TS_STATE_DIR"
+  chmod 750 "$TS_STATE_DIR"
 fi
 
 echo "[restore-state] Restore complete"

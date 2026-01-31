@@ -207,9 +207,9 @@ Without persistence, all data is lost when the container restarts. Add DO Spaces
 envs:
   - key: ENABLE_SPACES
     value: "true"
-  - key: LITESTREAM_ACCESS_KEY_ID
+  - key: AWS_ACCESS_KEY_ID
     type: SECRET
-  - key: LITESTREAM_SECRET_ACCESS_KEY
+  - key: AWS_ACCESS_KEY_ID
     type: SECRET
   - key: SPACES_ENDPOINT
     value: tor1.digitaloceanspaces.com  # Match your region
@@ -306,8 +306,8 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 
 | Variable | Description |
 |----------|-------------|
-| `LITESTREAM_ACCESS_KEY_ID` | Spaces access key |
-| `LITESTREAM_SECRET_ACCESS_KEY` | Spaces secret key |
+| `AWS_ACCESS_KEY_ID` | Spaces access key |
+| `AWS_ACCESS_KEY_ID` | Spaces secret key |
 | `SPACES_ENDPOINT` | e.g., `tor1.digitaloceanspaces.com` |
 | `SPACES_BUCKET` | Your bucket name |
 | `RESTIC_PASSWORD` | Backup encryption password |

@@ -4,7 +4,7 @@
 CONFIG_FILE="/etc/moltbot/backup.yaml"
 
 # Skip if persistence not configured
-if [ -z "$LITESTREAM_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
+if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$SPACES_BUCKET" ]; then
   echo "[setup-restic] Persistence not configured, skipping"
   exit 0
 fi
@@ -15,8 +15,18 @@ echo "[setup-restic] Configuring restic for DO Spaces..."
 mkdir -p /run/s6/container_environment
 
 # Export AWS credentials for restic S3 backend
-echo "$LITESTREAM_ACCESS_KEY_ID" > /run/s6/container_environment/AWS_ACCESS_KEY_ID
-echo "$LITESTREAM_SECRET_ACCESS_KEY" > /run/s6/container_environment/AWS_SECRET_ACCESS_KEY
+echo "$AWS_ACCESS_KEY_ID" > /run/s6/container_environment/AWS_ACCESS_KEY_ID
+echo "$AWS_SECRET_ACCESS_KEY" > /run/s6/container_environment/AWS_SECRET_ACCESS_KEY
+
+# Export Spaces configuration (needed for repository path expansion in backup.yaml)
+echo "${SPACES_ENDPOINT:-}" > /run/s6/container_environment/SPACES_ENDPOINT
+echo "${SPACES_BUCKET:-}" > /run/s6/container_environment/SPACES_BUCKET
+
+# Export STABLE_HOSTNAME (needed for repository path expansion in backup.yaml)
+# Default to 'moltbot' if not set
+STABLE_HOSTNAME="${STABLE_HOSTNAME:-moltbot}"
+echo "$STABLE_HOSTNAME" > /run/s6/container_environment/STABLE_HOSTNAME
+export STABLE_HOSTNAME
 
 # Set restic password (from env or generate a persistent one)
 if [ -z "$RESTIC_PASSWORD" ]; then
@@ -36,13 +46,33 @@ echo "$RESTIC_PASSWORD" > /run/s6/container_environment/RESTIC_PASSWORD
 echo "$STABLE_HOSTNAME" > /run/s6/container_environment/RESTIC_HOST
 
 # Build repository URL from config (expand env vars)
+# Ensure SPACES_ENDPOINT and SPACES_BUCKET are exported for eval
+export SPACES_ENDPOINT SPACES_BUCKET
+
+# Validate required variables are set
+if [ -z "$SPACES_ENDPOINT" ] || [ -z "$SPACES_BUCKET" ] || [ -z "$STABLE_HOSTNAME" ]; then
+  echo "[setup-restic] ERROR: SPACES_ENDPOINT, SPACES_BUCKET, or STABLE_HOSTNAME not set" >&2
+  echo "[setup-restic] SPACES_ENDPOINT=${SPACES_ENDPOINT:-unset}" >&2
+  echo "[setup-restic] SPACES_BUCKET=${SPACES_BUCKET:-unset}" >&2
+  echo "[setup-restic] STABLE_HOSTNAME=${STABLE_HOSTNAME:-unset}" >&2
+  exit 1
+fi
+
 REPO_TEMPLATE=$(yq -r '.repository' "$CONFIG_FILE")
 RESTIC_REPOSITORY=$(eval echo "$REPO_TEMPLATE")
+
+# Validate repository path was expanded correctly (should not contain ${})
+if echo "$RESTIC_REPOSITORY" | grep -q '\${'; then
+  echo "[setup-restic] ERROR: Repository path contains unexpanded variables: $RESTIC_REPOSITORY" >&2
+  echo "[setup-restic] Template was: $REPO_TEMPLATE" >&2
+  exit 1
+fi
+
 echo "$RESTIC_REPOSITORY" > /run/s6/container_environment/RESTIC_REPOSITORY
 
 # Export for current script
-export AWS_ACCESS_KEY_ID="$LITESTREAM_ACCESS_KEY_ID"
-export AWS_SECRET_ACCESS_KEY="$LITESTREAM_SECRET_ACCESS_KEY"
+export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
 export RESTIC_PASSWORD
 export RESTIC_REPOSITORY
 

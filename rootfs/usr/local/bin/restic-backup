@@ -35,6 +35,13 @@ if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
   exit 0
 fi
 
+# Ensure AWS credentials are exported for restic S3 backend
+if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+  log "ERROR: AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY not set"
+  exit 1
+fi
+export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY RESTIC_REPOSITORY RESTIC_PASSWORD
+
 # Check if config exists
 if [ ! -f "$CONFIG_FILE" ]; then
   log "Config file not found: $CONFIG_FILE"
