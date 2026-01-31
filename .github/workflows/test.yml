@@ -18,10 +18,33 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Create minimal .env for testing
         run: |
-          docker build --platform linux/amd64 -t moltbot-test .
-          if [ $? -ne 0 ]; then
-            echo "error: Docker build failed"
-            exit 1
-          fi
+          cat > .env << 'EOF'
+          ENABLE_TAILSCALE=false
+          ENABLE_NGROK=false
+          ENABLE_SPACES=false
+          ENABLE_SSH=false
+          STABLE_HOSTNAME=moltbot-test
+          EOF
+
+      - name: Build and start container
+        run: ./rebuild.sh
+
+      - name: Dump process list
+        run: |
+          echo "Waiting for services to start..."
+          sleep 10
+
+          echo "=== Container Status ==="
+          docker ps -a --filter name=moltbot-test
+
+          echo "=== Container Logs ==="
+          docker logs moltbot-test
+
+          echo "=== Process List ==="
+          docker exec moltbot-test ps aux || echo "Container not running, skipping process list"
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f moltbot-test || true
