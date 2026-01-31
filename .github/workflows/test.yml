@@ -46,6 +46,13 @@ jobs:
         if: always()
         run: docker exec moltbot-test ps aux || echo "Container not running"
 
+      - name: Verify container is running
+        run: |
+          if ! docker ps --filter name=moltbot-test --filter status=running | grep -q moltbot-test; then
+            echo "error: Container is not running"
+            exit 1
+          fi
+
       - name: Cleanup
         if: always()
         run: docker rm -f moltbot-test || true
