@@ -30,7 +30,7 @@ The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) f
 - `tailscale/` - Tailscale daemon (if ENABLE_TAILSCALE=true)
 - `moltbot/` - OpenClaw gateway
 - `ngrok/` - ngrok tunnel (if ENABLE_NGROK=true)
-- `sshd/` - SSH server (if ENABLE_SSH=true)
+- `sshd/` - SSH server (if SSH_ENABLE=true)
 - `backup/` - Periodic Restic backup service (if ENABLE_SPACES=true)
 - `prune/` - Periodic Restic snapshot cleanup (if ENABLE_SPACES=true)
 - `crond/` - Cron daemon for scheduled tasks

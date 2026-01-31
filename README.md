@@ -37,7 +37,7 @@ Deploy [OpenClaw](https://github.com/moltbot/moltbot) - a multi-channel AI messa
 │  │  • Tailscale (ENABLE_TAILSCALE) - Private network            │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────────────────────────────┐  │
-│  │ Optional: SSH Server (ENABLE_SSH=true)                       │  │
+│  │ Optional: SSH Server (SSH_ENABLE=true)                        │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────┘
          │                    │                    │
@@ -311,7 +311,7 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 | `ENABLE_TAILSCALE` | `false` | Enable Tailscale |
 | `ENABLE_SPACES` | `false` | Enable DO Spaces persistence |
 | `ENABLE_UI` | `true` | Enable web Control UI |
-| `ENABLE_SSH` | `false` | Enable SSH server |
+| `SSH_ENABLE` | `false` | Enable SSH server |
 
 ### ngrok (when ENABLE_NGROK=true)
 

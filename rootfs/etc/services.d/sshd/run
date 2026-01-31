@@ -1,8 +1,8 @@
 #!/command/with-contenv bash
-# SSH server (optional, enabled via ENABLE_SSH=true)
+# SSH server (optional, enabled via SSH_ENABLE=true)
 
-if [ "${ENABLE_SSH:-false}" != "true" ]; then
-  echo "[sshd] SSH disabled (set ENABLE_SSH=true to enable)"
+if [ "${SSH_ENABLE:-false}" != "true" ]; then
+  echo "[sshd] SSH disabled (set SSH_ENABLE=true to enable)"
   # Mark this service as down so s6 doesn't restart it
   s6-svc -Od .
   exit 0

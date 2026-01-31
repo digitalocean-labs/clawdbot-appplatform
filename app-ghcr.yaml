@@ -98,7 +98,7 @@ workers:
       - key: GRADIENT_API_KEY
         scope: RUN_TIME
         type: SECRET
-      - key: ENABLE_SSH
+      - key: SSH_ENABLE
         scope: RUN_TIME
         value: "false"
       - key: GITHUB_USERNAME

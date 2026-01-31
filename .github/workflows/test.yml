@@ -24,7 +24,7 @@ jobs:
           ENABLE_TAILSCALE=false
           ENABLE_NGROK=false
           ENABLE_SPACES=false
-          ENABLE_SSH=false
+          SSH_ENABLE=false
           STABLE_HOSTNAME=moltbot-test
           # Keep container running even if services fail (0=continue, 1=SIGTERM, 2=SIGKILL)
           S6_BEHAVIOUR_IF_STAGE2_FAILS=0

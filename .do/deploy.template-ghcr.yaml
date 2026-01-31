@@ -80,7 +80,7 @@ spec:
         - key: MOLTBOT_GATEWAY_TOKEN
           scope: RUN_TIME
           type: SECRET
-        - key: ENABLE_SSH
+        - key: SSH_ENABLE
           scope: RUN_TIME
           value: "false"
         - key: GITHUB_USERNAME
