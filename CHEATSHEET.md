@@ -167,6 +167,33 @@ mb agents status                                  # Agent status
 
 ---
 
+## Backup & Restore (Restic)
+
+```bash
+# View snapshots
+restic snapshots
+
+# View latest snapshot for a specific path
+restic snapshots --path /data/.moltbot --latest 1
+
+# Manually trigger backup
+/usr/local/bin/restic-backup
+
+# Manually restore a path
+restic restore latest --target / --include /data/.moltbot
+
+# Check repository status
+restic check
+
+# View repository stats
+restic stats
+
+# Prune old snapshots (done automatically hourly)
+/usr/local/bin/restic-prune
+```
+
+---
+
 ## Troubleshooting
 
 ```bash
@@ -193,6 +220,8 @@ ls /etc/services.d/*/dependencies.d/
 | Issue | Fix |
 |-------|-----|
 | "Gateway token not configured" | `jq .gateway.auth.token /data/.moltbot/moltbot.json` |
-| WhatsApp disconnected after restart | `mb channels login` (re-scan QR) |
+| WhatsApp disconnected after restart | `mb channels login` (re-scan QR) or check if backup restored state |
 | ngrok tunnel not accessible | `curl http://127.0.0.1:4040/api/tunnels` then restart |
 | Command not found (as root) | Use `mb` wrapper instead of `moltbot` |
+| Backup not running | Check: `ps aux \| grep restic-backup` and logs in `/proc/1/fd/1` |
+| Data lost after restart | Verify `ENABLE_SPACES=true` and check `restic snapshots` |

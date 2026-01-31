@@ -6,10 +6,11 @@ This repository contains the Docker configuration and deployment templates for r
 
 ## Key Files
 
-- `Dockerfile` - Builds image with Ubuntu Noble, s6-overlay, Tailscale, Homebrew, pnpm, and moltbot
+- `Dockerfile` - Builds image with Ubuntu Noble, s6-overlay, Tailscale, Restic, Homebrew, pnpm, and moltbot
 - `app.yaml` - App Platform service configuration (for reference, uses worker for Tailscale)
 - `.do/deploy.template.yaml` - App Platform worker configuration (recommended)
-- `moltbot.default.json` - Base gateway configuration
+- `rootfs/etc/moltbot/moltbot.default.json` - Base gateway configuration template
+- `rootfs/etc/moltbot/backup.yaml` - Restic backup configuration (paths, intervals, retention policy)
 - `tailscale` - Wrapper script to inject socket path for tailscale CLI
 - `rootfs/` - Overlay directory for custom files and s6 services
 
@@ -18,14 +19,21 @@ This repository contains the Docker configuration and deployment templates for r
 The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) for process supervision:
 
 **Initialization scripts** (`rootfs/etc/cont-init.d/`):
-- `10-restore-state` - Restores state from DO Spaces backup
+- `00-setup-tailscale` - Configures Tailscale networking (if enabled)
+- `05-setup-restic` - Initializes Restic repository and exports environment variables
+- `06-restore-packages` - Restores dpkg package list from backup
+- `10-restore-state` - Restores application state from Restic snapshots
+- `15-reinstall-brews` - Reinstalls Homebrew packages from backup (if Homebrew installed)
 - `20-generate-config` - Builds moltbot.json from environment variables
 
 **Services** (`rootfs/etc/services.d/`):
-- `tailscale/` - Tailscale daemon (required)
+- `tailscale/` - Tailscale daemon (if ENABLE_TAILSCALE=true)
 - `moltbot/` - Moltbot gateway
+- `ngrok/` - ngrok tunnel (if ENABLE_NGROK=true)
 - `sshd/` - SSH server (if ENABLE_SSH=true)
-- `backup/` - Periodic state backup (if persistence configured)
+- `backup/` - Periodic Restic backup service (if ENABLE_SPACES=true)
+- `prune/` - Periodic Restic snapshot cleanup (if ENABLE_SPACES=true)
+- `crond/` - Cron daemon for scheduled tasks
 
 Users can add custom init scripts (prefix with `30-` or higher) and custom services.
 
@@ -52,9 +60,64 @@ Set `GRADIENT_API_KEY` to enable DigitalOcean's serverless AI inference with mod
 
 ## Persistence
 
-Optional DO Spaces backup:
-- JSON state: periodic backup every 5 minutes
-- Tailscale state: periodic backup every 5 minutes
+Optional DO Spaces backup via [Restic](https://restic.net/):
+
+**Backup System:**
+- Uses Restic for incremental, encrypted snapshots to DigitalOcean Spaces (S3-compatible)
+- Backup service runs continuously, creating snapshots every 30 seconds (configurable via `backup.yaml`)
+- Prune service runs hourly to remove old snapshots and optimize storage
+- Repository is automatically initialized on first run
+
+**What Gets Backed Up:**
+- `/etc` - System configuration
+- `/root` - Root user home directory
+- `/data/.moltbot` - Moltbot state (config, sessions, agents, cron)
+- `/data/tailscale` - Tailscale connection state
+- `/home` - User home directories (includes Homebrew packages)
+
+**Restore on Startup:**
+- `10-restore-state` init script runs on container start
+- Restores latest snapshot for each path from Restic repository
+- Fixes file ownership (moltbot user) after restore
+- Skips restore if no snapshots found (first run)
+
+**Configuration:**
+- Repository URL: `s3:<endpoint>/<bucket>/<hostname>/restic`
+- Backup paths and intervals defined in `/etc/moltbot/backup.yaml`
+- Encrypted with `RESTIC_PASSWORD`
+- Access via Spaces credentials (`RESTIC_SPACES_ACCESS_KEY_ID`, `RESTIC_SPACES_SECRET_ACCESS_KEY`)
+
+## Customizing Backup Configuration
+
+The backup system is configured via `/etc/moltbot/backup.yaml`:
+
+```yaml
+# Repository location (S3-compatible, variables expanded at runtime)
+repository: "s3:${RESTIC_SPACES_ENDPOINT}/${RESTIC_SPACES_BUCKET}/${RESTIC_HOST}/restic"
+
+# Backup paths (order matters for restore)
+paths:
+  - path: /etc
+  - path: /data/.moltbot
+    exclude:
+      - "*.lock"
+      - "*.pid"
+
+# Intervals
+backup_interval_seconds: 30  # Backup frequency
+prune_interval_seconds: 3600 # Prune frequency (1 hour)
+
+# Retention policy
+retention:
+  keep_last: 10      # Keep last 10 snapshots
+  keep_hourly: 48    # Keep 48 hourly snapshots
+  keep_daily: 30     # Keep 30 daily snapshots
+  keep_weekly: 8     # Keep 8 weekly snapshots
+  keep_monthly: 6    # Keep 6 monthly snapshots
+```
+
+To customize, add your own `rootfs/etc/moltbot/backup.yaml` and rebuild the image.
 
 ## Development
+
 It's a general rule, do not push code change and then trigger a deployment when trying to develop. It's always better to make the code changes inside the container and then restart the MoltBot service. That way we can iterate really fast. 

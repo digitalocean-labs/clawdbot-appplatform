@@ -221,11 +221,34 @@ envs:
 
 ### What Gets Persisted
 
-| Data | Method | Frequency |
-|------|--------|-----------|
-| Config, sessions | Restic | Every 30 seconds |
-| Tailscale state | Restic | Every 30 seconds |
-| apt and Homebrew packages | Restic |Every 30 seconds|
+The backup system uses [Restic](https://restic.net/) for incremental, encrypted snapshots to DigitalOcean Spaces.
+
+| Path | Contents | Backup Frequency |
+|------|----------|------------------|
+| `/data/.moltbot` | Gateway config, channel sessions, agents, memory | Every 30s (configurable) |
+| `/data/tailscale` | Tailscale connection state (persistent device) | Every 30s |
+| `/etc` | System configuration | Every 30s |
+| `/home` | User files, Homebrew packages | Every 30s |
+| `/root` | Root user data | Every 30s |
+
+**Automatic Restore:**
+- On container restart, `10-restore-state` init script automatically restores the latest snapshot for each path
+- Restores are fast and incremental
+- Data survives deployments, restarts, and instance replacements
+
+**Repository Management:**
+- Old snapshots are automatically pruned every hour
+- Repository is encrypted with `RESTIC_PASSWORD`
+- Stored in: `s3:<endpoint>/<bucket>/<hostname>/restic`
+
+**Configuration File:**
+Backup behavior is controlled by `/etc/moltbot/backup.yaml`:
+- **Backup paths**: What directories to back up
+- **Exclusions**: Files to skip (*.lock, *.pid, *.sock)
+- **Intervals**: Backup frequency (default: 30s), prune frequency (default: 1h)
+- **Retention policy**: How many snapshots to keep (last 10, hourly 48, daily 30, etc.)
+
+To customize, create `rootfs/etc/moltbot/backup.yaml` in your repo and rebuild.
 
 ---
 
@@ -351,7 +374,9 @@ exec my-daemon --foreground
 | `moltbot` | Moltbot gateway |
 | `ngrok` | ngrok tunnel (if enabled) |
 | `tailscale` | Tailscale daemon (if enabled) |
-| `backup` | Restic backup (if enabled) |
+| `backup` | Restic backup service - creates snapshots (if enabled) |
+| `prune` | Restic prune service - cleans old snapshots (if enabled) |
+| `crond` | Cron daemon for scheduled tasks |
 | `sshd` | SSH server (if enabled) |
 
 ---
@@ -361,6 +386,7 @@ exec my-daemon --foreground
 | Code | Location |
 |------|----------|
 | `nyc` | New York |
+| `atl` | Atlanta |
 | `ams` | Amsterdam |
 | `sfo` | San Francisco |
 | `sgp` | Singapore |
