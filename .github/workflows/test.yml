@@ -26,6 +26,7 @@ jobs:
           ENABLE_SPACES=false
           ENABLE_SSH=false
           STABLE_HOSTNAME=moltbot-test
+          S6_BEHAVIOUR_IF_STAGE2_FAILS=0
           EOF
 
       - name: Build and start container
