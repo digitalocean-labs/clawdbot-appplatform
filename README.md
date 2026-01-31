@@ -1,6 +1,6 @@
-# Moltbot on DigitalOcean App Platform
+# OpenClaw on DigitalOcean App Platform
 
-Deploy [Moltbot](https://github.com/moltbot/moltbot) - a multi-channel AI messaging gateway - on DigitalOcean App Platform in minutes.
+Deploy [OpenClaw](https://github.com/moltbot/moltbot) - a multi-channel AI messaging gateway - on DigitalOcean App Platform in minutes.
 
 [![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/digitalocean-labs/clawdbot-appplatform/tree/main)
 
@@ -26,7 +26,7 @@ Deploy [Moltbot](https://github.com/moltbot/moltbot) - a multi-channel AI messag
 │  │ s6-overlay - Process supervision and init system             │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │  ┌─────────────┐  ┌───────────────────┐                            │
-│  │ Ubuntu      │  │ Moltbot Gateway   │                            │
+│  │ Ubuntu      │  │ OpenClaw Gateway  │                            │
 │  │ Noble+Node  │  │ WebSocket :18789  │                            │
 │  │ + nvm       │  │ + Control UI      │                            │
 │  └─────────────┘  └───────────────────┘                            │
@@ -89,7 +89,7 @@ mb channels status --probe
 
 ### What's Included
 
-- ✅ Moltbot gateway (WebSocket on port 18789)
+- ✅ OpenClaw gateway (WebSocket on port 18789)
 - ✅ CLI access via `mb` command
 - ✅ All channel plugins (WhatsApp, Telegram, Discord, etc.)
 - ❌ No web UI access (use CLI/TUI)
@@ -254,7 +254,7 @@ To customize, create `rootfs/etc/moltbot/backup.yaml` in your repo and rebuild.
 
 ## AI-Assisted Setup
 
-Want an AI assistant to help deploy and configure Moltbot? See **[AI-ASSISTED-SETUP.md](AI-ASSISTED-SETUP.md)** for:
+Want an AI assistant to help deploy and configure OpenClaw? See **[AI-ASSISTED-SETUP.md](AI-ASSISTED-SETUP.md)** for:
 
 - Copy-paste prompts for each stage
 - WhatsApp channel setup (with QR code handling)
@@ -371,7 +371,7 @@ exec my-daemon --foreground
 
 | Service | Description |
 |---------|-------------|
-| `moltbot` | Moltbot gateway |
+| `moltbot` | OpenClaw gateway |
 | `ngrok` | ngrok tunnel (if enabled) |
 | `tailscale` | Tailscale daemon (if enabled) |
 | `backup` | Restic backup service - creates snapshots (if enabled) |
@@ -400,7 +400,7 @@ exec my-daemon --foreground
 
 ## Documentation
 
-- [Moltbot Documentation](https://docs.molt.bot)
+- [OpenClaw Documentation](https://docs.molt.bot)
 - [DigitalOcean App Platform](https://docs.digitalocean.com/products/app-platform/)
 - [AI-Assisted Setup Guide](AI-ASSISTED-SETUP.md)
 - [CLI Cheat Sheet](CHEATSHEET.md)

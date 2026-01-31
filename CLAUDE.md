@@ -1,12 +1,12 @@
-# Moltbot App Platform Deployment
+# OpenClaw App Platform Deployment
 
 ## Overview
 
-This repository contains the Docker configuration and deployment templates for running [Moltbot](https://github.com/moltbot/moltbot) on DigitalOcean App Platform with Tailscale networking.
+This repository contains the Docker configuration and deployment templates for running [OpenClaw](https://github.com/moltbot/moltbot) on DigitalOcean App Platform with Tailscale networking.
 
 ## Key Files
 
-- `Dockerfile` - Builds image with Ubuntu Noble, s6-overlay, Tailscale, Restic, Homebrew, pnpm, and moltbot
+- `Dockerfile` - Builds image with Ubuntu Noble, s6-overlay, Tailscale, Restic, Homebrew, pnpm, and OpenClaw
 - `app.yaml` - App Platform service configuration (for reference, uses worker for Tailscale)
 - `.do/deploy.template.yaml` - App Platform worker configuration (recommended)
 - `rootfs/etc/moltbot/moltbot.default.json` - Base gateway configuration template
@@ -28,7 +28,7 @@ The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) f
 
 **Services** (`rootfs/etc/services.d/`):
 - `tailscale/` - Tailscale daemon (if ENABLE_TAILSCALE=true)
-- `moltbot/` - Moltbot gateway
+- `moltbot/` - OpenClaw gateway
 - `ngrok/` - ngrok tunnel (if ENABLE_NGROK=true)
 - `sshd/` - SSH server (if ENABLE_SSH=true)
 - `backup/` - Periodic Restic backup service (if ENABLE_SPACES=true)
@@ -71,7 +71,7 @@ Optional DO Spaces backup via [Restic](https://restic.net/):
 **What Gets Backed Up:**
 - `/etc` - System configuration
 - `/root` - Root user home directory
-- `/data/.moltbot` - Moltbot state (config, sessions, agents, cron)
+- `/data/.moltbot` - OpenClaw state (config, sessions, agents, cron)
 - `/data/tailscale` - Tailscale connection state
 - `/home` - User home directories (includes Homebrew packages)
 
@@ -120,4 +120,4 @@ To customize, add your own `rootfs/etc/moltbot/backup.yaml` and rebuild the imag
 
 ## Development
 
-It's a general rule, do not push code change and then trigger a deployment when trying to develop. It's always better to make the code changes inside the container and then restart the MoltBot service. That way we can iterate really fast. 
+It's a general rule, do not push code change and then trigger a deployment when trying to develop. It's always better to make the code changes inside the container and then restart the OpenClaw service. That way we can iterate really fast. 

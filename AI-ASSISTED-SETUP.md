@@ -1,6 +1,6 @@
-# AI-Assisted Moltbot Setup
+# AI-Assisted OpenClaw Setup
 
-This guide enables AI coding assistants (Claude Code, Cursor, Codex, Gemini, etc.) to deploy and configure Moltbot on DigitalOcean App Platform.
+This guide enables AI coding assistants (Claude Code, Cursor, Codex, Gemini, etc.) to deploy and configure OpenClaw on DigitalOcean App Platform.
 
 ## Overview
 
@@ -10,7 +10,7 @@ This guide enables AI coding assistants (Claude Code, Cursor, Codex, Gemini, etc
 
 ## Prerequisites
 
-Before asking your AI assistant to deploy Moltbot:
+Before asking your AI assistant to deploy OpenClaw:
 
 ```bash
 # 1. Install and configure doctl
@@ -35,7 +35,7 @@ The simplest deployment - gateway with CLI access only via `doctl apps console`.
 ### Prompt
 
 ```
-Deploy Moltbot to DigitalOcean App Platform using the CLI-only configuration.
+Deploy OpenClaw to DigitalOcean App Platform using the CLI-only configuration.
 
 Use the app spec from https://github.com/digitalocean-labs/moltbot-appplatform with:
 - Instance size: basic-xxs (1 CPU, 512MB shared)
@@ -71,7 +71,7 @@ Public URL access to the Control UI via ngrok tunnel.
 ### Prompt
 
 ```
-Upgrade my Moltbot deployment to Stage 2 with ngrok for public access.
+Upgrade my OpenClaw deployment to Stage 2 with ngrok for public access.
 
 Update the app configuration:
 - Instance size: basic-xs (1 CPU, 1GB shared)
@@ -111,7 +111,7 @@ Private network access - most secure for production use.
 ### Prompt
 
 ```
-Upgrade my Moltbot deployment to Stage 3 with Tailscale for private access.
+Upgrade my OpenClaw deployment to Stage 3 with Tailscale for private access.
 
 Update the app configuration:
 - Instance size: basic-s (1 CPU, 2GB shared)
@@ -152,7 +152,7 @@ Add DO Spaces backup to preserve data across restarts.
 ### Prompt
 
 ```
-Add persistence to my Moltbot deployment using DO Spaces.
+Add persistence to my OpenClaw deployment using DO Spaces.
 
 I have a Spaces bucket ready:
 - Bucket: <bucket-name>
@@ -197,10 +197,10 @@ The AI assistant can use this approach:
 ### Prompt for WhatsApp Setup
 
 ```
-Help me connect WhatsApp to my Moltbot deployment.
+Help me connect WhatsApp to my OpenClaw deployment.
 
 Use the do-app-sandbox SDK with pexpect to:
-1. Connect to my Moltbot container (app-id: <app-id>)
+1. Connect to my OpenClaw container (app-id: <app-id>)
 2. First logout any existing session: mb channels logout --channel whatsapp
 3. Restart moltbot: /command/s6-svc -r /run/service/moltbot
 4. Run the login command and stream output to a local file so I can see the QR code
@@ -259,7 +259,7 @@ mb channels status --probe
 # Should show: WhatsApp default: enabled, configured, linked, running, connected
 
 # Send test message
-mb message send --channel whatsapp --target "+1234567890" --message "Hello from Moltbot!"
+mb message send --channel whatsapp --target "+1234567890" --message "Hello from OpenClaw!"
 
 # Check for reply in logs
 tail -f /data/.moltbot/logs/gateway.log
@@ -333,7 +333,7 @@ cat /run/s6/container_environment/MOLTBOT_GATEWAY_TOKEN
 
 ### External Resources
 
-- [Moltbot Documentation](https://docs.molt.bot)
+- [OpenClaw Documentation](https://docs.molt.bot)
 - [do-app-sandbox PyPI](https://pypi.org/project/do-app-sandbox/)
 - [do-app-platform-skills](https://github.com/digitalocean-labs/do-app-platform-skills)
 - [DigitalOcean App Platform Docs](https://docs.digitalocean.com/products/app-platform/)

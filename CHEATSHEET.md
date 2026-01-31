@@ -1,4 +1,4 @@
-# Moltbot CLI Cheat Sheet
+# OpenClaw CLI Cheat Sheet
 
 ## The `mb` Command
 
@@ -106,7 +106,7 @@ ls /run/service/                                  # List all services
 ```bash
 tail -f /data/.moltbot/logs/gateway.log           # Gateway logs (live)
 tail -100 /data/.moltbot/logs/gateway.log         # Last 100 lines
-mb logs --follow                                  # Moltbot log command
+mb logs --follow                                  # OpenClaw log command
 ```
 
 ---

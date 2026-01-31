@@ -43,7 +43,7 @@ if ! command -v moltbot >/dev/null 2>&1; then
   echo "[generate-config] Node version: $(node --version 2>&1 || echo 'not found')" >&2
   exit 1
 fi
-echo "[generate-config] Moltbot version: $(moltbot --version 2>/dev/null || echo 'unknown')"
+echo "[generate-config] OpenClaw version: $(moltbot --version 2>/dev/null || echo 'unknown')"
 
 # Generate a gateway token if not provided
 if [ -z "$MOLTBOT_GATEWAY_TOKEN" ]; then

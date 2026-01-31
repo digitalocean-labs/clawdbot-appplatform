@@ -1,4 +1,4 @@
-# Moltbot Backup Configuration
+# OpenClaw Backup Configuration
 # Users can override this file in their rootfs/etc/moltbot/backup.yaml
 
 # Restic repository location (S3-compatible)

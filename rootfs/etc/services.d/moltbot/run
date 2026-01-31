@@ -1,5 +1,5 @@
 #!/command/with-contenv bash
-# Moltbot gateway service
+# OpenClaw gateway service
 
 echo "[moltbot] Starting moltbot gateway..."
 
