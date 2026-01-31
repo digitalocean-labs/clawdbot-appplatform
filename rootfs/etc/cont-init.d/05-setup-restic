@@ -5,7 +5,7 @@ source /etc/s6-overlay/lib/env-utils.sh
 persist_env_prefix RESTIC_ 
 
 persist_env_var RESTIC_ \
-  RESTIC_HOST="${HOSTNAME}" \
+  RESTIC_HOST="${STABLE_HOSTNAME}" \
 
 source_env_prefix RESTIC_
 

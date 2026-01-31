@@ -12,7 +12,7 @@ persist_env_prefix TS_
 
 # Persist TS_ vars with defaults
 persist_env_var TS_ \
-  TS_HOSTNAME="${HOSTNAME:-moltbot}" \
+  TS_HOSTNAME="${STABLE_HOSTNAME}" \
   TS_SOCKET=/tmp/tailscaled.sock \
   TS_USERSPACE=true \
   TS_STATE_DIR=/data/tailscale \
