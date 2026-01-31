@@ -4,9 +4,9 @@
 
 set -e
 
-# Source s6 container environment (required for cron which doesn't inherit env)
-for f in /run/s6/container_environment/RESTIC_*; do
-  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
+# Load RESTIC_ env vars
+for f in /run/s6/container_environment/RESTIC_/*; do
+  [ -f "$f" ] && export "$(basename "$f")"="$(cat "$f")"
 done
 
 CONFIG_FILE="/etc/moltbot/backup.yaml"
@@ -35,7 +35,6 @@ if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then
   exit 0
 fi
 
-
 # Ensure Spaces credentials are exported for restic S3 backend
 if [ -z "$RESTIC_SPACES_ACCESS_KEY_ID" ] || [ -z "$RESTIC_SPACES_SECRET_ACCESS_KEY" ]; then
   log "ERROR: RESTIC_SPACES_ACCESS_KEY_ID or RESTIC_SPACES_SECRET_ACCESS_KEY not set"
@@ -62,24 +61,24 @@ log "Starting backup of $PATH_COUNT paths..."
 # Build restic backup command for each path
 for i in $(seq 0 $((PATH_COUNT - 1))); do
   BACKUP_PATH=$(yq -r ".paths[$i].path" "$CONFIG_FILE")
-  
+
   # Skip if path doesn't exist
   if [ ! -e "$BACKUP_PATH" ]; then
     log "Path does not exist, skipping: $BACKUP_PATH"
     continue
   fi
-  
+
   # Build exclude arguments
   EXCLUDE_ARGS=""
   EXCLUDE_COUNT=$(yq -r ".paths[$i].exclude | length // 0" "$CONFIG_FILE")
-  
+
   for j in $(seq 0 $((EXCLUDE_COUNT - 1))); do
     PATTERN=$(yq -r ".paths[$i].exclude[$j]" "$CONFIG_FILE")
     EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$PATTERN"
   done
-  
+
   log "Backing up: $BACKUP_PATH"
-  
+
   # Run restic backup
   if restic backup $EXCLUDE_ARGS "$BACKUP_PATH" 2>&1 | grep -v "^unchanged\|^modified\|^new" || true; then
     log "Completed: $BACKUP_PATH"

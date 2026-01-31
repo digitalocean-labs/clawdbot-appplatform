@@ -27,7 +27,7 @@ The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) f
 - `20-generate-config` - Builds moltbot.json from environment variables
 
 **Services** (`rootfs/etc/services.d/`):
-- `tailscale/` - Tailscale daemon (if ENABLE_TAILSCALE=true)
+- `tailscale/` - Tailscale daemon (if TAILSCALE_ENABLE=true)
 - `moltbot/` - OpenClaw gateway
 - `ngrok/` - ngrok tunnel (if ENABLE_NGROK=true)
 - `sshd/` - SSH server (if SSH_ENABLE=true)

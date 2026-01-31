@@ -39,7 +39,7 @@ Deploy OpenClaw to DigitalOcean App Platform using the CLI-only configuration.
 
 Use the app spec from https://github.com/digitalocean-labs/moltbot-appplatform with:
 - Instance size: basic-xxs (1 CPU, 512MB shared)
-- All feature flags disabled (ENABLE_NGROK=false, ENABLE_TAILSCALE=false, ENABLE_SPACES=false)
+- All feature flags disabled (ENABLE_NGROK=false, TAILSCALE_ENABLE=false, ENABLE_SPACES=false)
 - ENABLE_UI=true (so we can use UI later if needed)
 
 After deployment:
@@ -116,7 +116,7 @@ Upgrade my OpenClaw deployment to Stage 3 with Tailscale for private access.
 Update the app configuration:
 - Instance size: basic-s (1 CPU, 2GB shared)
 - Set ENABLE_NGROK=false
-- Set ENABLE_TAILSCALE=true
+- Set TAILSCALE_ENABLE=true
 - Add TS_AUTHKEY (I'll provide it)
 - Set STABLE_HOSTNAME=moltbot
 
@@ -269,10 +269,10 @@ tail -f /data/.moltbot/logs/gateway.log
 
 ## Deployment Modes
 
-| Mode | When to Use |
-|------|-------------|
+| Mode               | When to Use                            |
+| ------------------ | -------------------------------------- |
 | **Laptop (doctl)** | Development, testing, quick iterations |
-| **GitHub Actions** | Production, CI/CD, team deployments |
+| **GitHub Actions** | Production, CI/CD, team deployments    |
 
 ### Deploy from Laptop
 
@@ -297,12 +297,12 @@ See `.github/workflows/deploy.yml` for automated deployment on push.
 
 ### Key Files
 
-| File | Purpose |
-|------|---------|
-| `app.yaml` | App Platform spec with feature flags |
-| `.do/deploy.template.yaml` | Template for Deploy to DO button |
-| `CHEATSHEET.md` | CLI commands reference |
-| `.env.example` | Environment variable template |
+| File                       | Purpose                              |
+| -------------------------- | ------------------------------------ |
+| `app.yaml`                 | App Platform spec with feature flags |
+| `.do/deploy.template.yaml` | Template for Deploy to DO button     |
+| `CHEATSHEET.md`            | CLI commands reference               |
+| `.env.example`             | Environment variable template        |
 
 ### Important Commands
 
@@ -324,12 +324,12 @@ cat /run/s6/container_environment/MOLTBOT_GATEWAY_TOKEN
 
 ### Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| "Command not found" in console | Use `mb` wrapper instead of `moltbot` |
-| Gateway not starting | Check logs: `tail -100 /data/.moltbot/logs/gateway.log` |
-| WhatsApp disconnected | Re-run `mb channels login` and scan QR |
-| ngrok URL not working | Restart ngrok: `/command/s6-svc -r /run/service/ngrok` |
+| Issue                          | Solution                                                |
+| ------------------------------ | ------------------------------------------------------- |
+| "Command not found" in console | Use `mb` wrapper instead of `moltbot`                   |
+| Gateway not starting           | Check logs: `tail -100 /data/.moltbot/logs/gateway.log` |
+| WhatsApp disconnected          | Re-run `mb channels login` and scan QR                  |
+| ngrok URL not working          | Restart ngrok: `/command/s6-svc -r /run/service/ngrok`  |
 
 ### External Resources
 

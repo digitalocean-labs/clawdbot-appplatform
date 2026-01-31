@@ -1,12 +1,12 @@
 name: moltbot
-region: tor  # Available: nyc, ams, sfo, sgp, lon, fra, blr, syd, tor
+region: tor # Available: nyc, ams, sfo, sgp, lon, fra, blr, syd, tor
 
 workers:
   - name: moltbot
     dockerfile_path: /Dockerfile
     source_dir: /
     instance_count: 1
-    instance_size_slug: apps-s-1vcpu-2gb  # Minimum 2GB required - 1GB causes heap overflow
+    instance_size_slug: apps-s-1vcpu-2gb # Minimum 2GB required - 1GB causes heap overflow
     github:
       branch: main
       deploy_on_push: true
@@ -29,7 +29,7 @@ workers:
       - key: ENABLE_NGROK
         scope: RUN_TIME
         value: "false"
-      - key: ENABLE_TAILSCALE
+      - key: TAILSCALE_ENABLE
         scope: RUN_TIME
         value: "false"
       - key: ENABLE_SPACES
@@ -50,14 +50,13 @@ workers:
 
       # ============================================================
       # TAILSCALE - Private Network Access
-      # Set ENABLE_TAILSCALE=true and provide your auth key
+      # Set TAILSCALE_ENABLE=true and provide your auth key
       # Get key: https://login.tailscale.com/admin/settings/keys
       # NOTE: Mutually exclusive with ngrok
       # ============================================================
       - key: TS_AUTHKEY
         scope: RUN_TIME
         type: SECRET
-   
 
       # ============================================================
       # SPACES - Data Persistence

@@ -4,9 +4,9 @@
 
 set -e
 
-# Source s6 container environment (required for cron which doesn't inherit env)
-for f in /run/s6/container_environment/RESTIC_*; do
-  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
+# Load RESTIC_ env vars
+for f in /run/s6/container_environment/RESTIC_/*; do
+  [ -f "$f" ] && export "$(basename "$f")"="$(cat "$f")"
 done
 
 CONFIG_FILE="/etc/moltbot/backup.yaml"

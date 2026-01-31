@@ -1,10 +1,9 @@
 #!/command/with-contenv bash
 # Restore state paths from restic backup
+source /etc/s6-overlay/lib/env-utils.sh
 
-# Source s6 container environment (needed for cont-init scripts)
-for f in /run/s6/container_environment/*; do
-  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
-done
+# Load RESTIC_ vars
+source_env_prefix RESTIC_
 
 CONFIG_FILE="/etc/moltbot/backup.yaml"
 

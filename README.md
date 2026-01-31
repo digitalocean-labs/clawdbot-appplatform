@@ -6,12 +6,12 @@ Deploy [OpenClaw](https://github.com/moltbot/moltbot) - a multi-channel AI messa
 
 ## Quick Start: Choose Your Stage
 
-| Stage | What You Get | Access Method |
-|-------|--------------|---------------|
-| **1. CLI Only** | Gateway + CLI | `doctl apps console` |
-| **2. + Web UI + ngrok** | Control UI + Public URL | ngrok URL |
-| **3. + Tailscale** | Private Network | Tailscale hostname |
-| **+ Persistence** | Data survives restarts | DO Spaces |
+| Stage                   | What You Get            | Access Method        |
+| ----------------------- | ----------------------- | -------------------- |
+| **1. CLI Only**         | Gateway + CLI           | `doctl apps console` |
+| **2. + Web UI + ngrok** | Control UI + Public URL | ngrok URL            |
+| **3. + Tailscale**      | Private Network         | Tailscale hostname   |
+| **+ Persistence**       | Data survives restarts  | DO Spaces            |
 
 **Start simple, add features as needed.** Most users start with Stage 2 (ngrok) for the easiest setup.
 
@@ -34,7 +34,7 @@ Deploy [OpenClaw](https://github.com/moltbot/moltbot) - a multi-channel AI messa
 │  │ Access Layer (choose one):                                   │  │
 │  │  • Console only (default) - doctl apps console               │  │
 │  │  • ngrok (ENABLE_NGROK) - Public tunnel to UI                │  │
-│  │  • Tailscale (ENABLE_TAILSCALE) - Private network            │  │
+│  │  • Tailscale (TAILSCALE_ENABLE) - Private network            │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │ Optional: SSH Server (SSH_ENABLE=true)                        │  │
@@ -160,7 +160,7 @@ instance_size_slug: apps-s-1vcpu-2gb  # 1 CPU, 2GB
 envs:
   - key: ENABLE_NGROK
     value: "false"
-  - key: ENABLE_TAILSCALE
+  - key: TAILSCALE_ENABLE
     value: "true"
   - key: TS_AUTHKEY
     type: SECRET
@@ -223,13 +223,13 @@ envs:
 
 The backup system uses [Restic](https://restic.net/) for incremental, encrypted snapshots to DigitalOcean Spaces.
 
-| Path | Contents | Backup Frequency |
-|------|----------|------------------|
-| `/data/.moltbot` | Gateway config, channel sessions, agents, memory | Every 30s (configurable) |
-| `/data/tailscale` | Tailscale connection state (persistent device) | Every 30s |
-| `/etc` | System configuration | Every 30s |
-| `/home` | User files, Homebrew packages | Every 30s |
-| `/root` | Root user data | Every 30s |
+| Path              | Contents                                         | Backup Frequency         |
+| ----------------- | ------------------------------------------------ | ------------------------ |
+| `/data/.moltbot`  | Gateway config, channel sessions, agents, memory | Every 30s (configurable) |
+| `/data/tailscale` | Tailscale connection state (persistent device)   | Every 30s                |
+| `/etc`            | System configuration                             | Every 30s                |
+| `/home`           | User files, Homebrew packages                    | Every 30s                |
+| `/root`           | Root user data                                   | Every 30s                |
 
 **Automatic Restore:**
 - On container restart, `10-restore-state` init script automatically restores the latest snapshot for each path
@@ -298,50 +298,50 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 
 ### Required
 
-| Variable | Description |
-|----------|-------------|
-| `SETUP_PASSWORD` | Password for web setup wizard |
-|`STABLE_HOSTNAME` | A stable hostname for this instance|
+| Variable          | Description                         |
+| ----------------- | ----------------------------------- |
+| `SETUP_PASSWORD`  | Password for web setup wizard       |
+| `STABLE_HOSTNAME` | A stable hostname for this instance |
 
 ### Feature Flags
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ENABLE_NGROK` | `false` | Enable ngrok tunnel |
-| `ENABLE_TAILSCALE` | `false` | Enable Tailscale |
-| `ENABLE_SPACES` | `false` | Enable DO Spaces persistence |
-| `ENABLE_UI` | `true` | Enable web Control UI |
-| `SSH_ENABLE` | `false` | Enable SSH server |
+| Variable           | Default | Description                  |
+| ------------------ | ------- | ---------------------------- |
+| `ENABLE_NGROK`     | `false` | Enable ngrok tunnel          |
+| `ENABLE_TAILSCALE` | `false` | Enable Tailscale             |
+| `ENABLE_SPACES`    | `false` | Enable DO Spaces persistence |
+| `ENABLE_UI`        | `true`  | Enable web Control UI        |
+| `SSH_ENABLE`       | `false` | Enable SSH server            |
 
 ### ngrok (when ENABLE_NGROK=true)
 
-| Variable | Description |
-|----------|-------------|
+| Variable          | Description           |
+| ----------------- | --------------------- |
 | `NGROK_AUTHTOKEN` | Your ngrok auth token |
 
-### Tailscale (when ENABLE_TAILSCALE=true)
+### Tailscale (when TAILSCALE_ENABLE=true)
 
-| Variable | Description |
-|----------|-------------|
+| Variable     | Description        |
+| ------------ | ------------------ |
 | `TS_AUTHKEY` | Tailscale auth key |
 
 ### Spaces (when ENABLE_SPACES=true)
 
-| Variable | Description |
-|----------|-------------|
-| `RESTIC_SPACES_ACCESS_KEY_ID` | Spaces access key |
-| `RESTIC_SPACES_SECRET_ACCESS_KEY` | Spaces secret key |
-| `RESTIC_SPACES_ENDPOINT` | e.g., `tor1.digitaloceanspaces.com` |
-| `RESTIC_SPACES_BUCKET` | Your bucket name |
-| `RESTIC_PASSWORD` | Backup encryption password |
+| Variable                          | Description                         |
+| --------------------------------- | ----------------------------------- |
+| `RESTIC_SPACES_ACCESS_KEY_ID`     | Spaces access key                   |
+| `RESTIC_SPACES_SECRET_ACCESS_KEY` | Spaces secret key                   |
+| `RESTIC_SPACES_ENDPOINT`          | e.g., `tor1.digitaloceanspaces.com` |
+| `RESTIC_SPACES_BUCKET`            | Your bucket name                    |
+| `RESTIC_PASSWORD`                 | Backup encryption password          |
 
 ### Optional
 
-| Variable | Description |
-|----------|-------------|
+| Variable                | Description                                    |
+| ----------------------- | ---------------------------------------------- |
 | `MOLTBOT_GATEWAY_TOKEN` | Gateway auth token (auto-generated if not set) |
-| `GRADIENT_API_KEY` | DigitalOcean Gradient AI key |
-| `GITHUB_USERNAME` | For SSH key fetching |
+| `GRADIENT_API_KEY`      | DigitalOcean Gradient AI key                   |
+| `GITHUB_USERNAME`       | For SSH key fetching                           |
 
 ---
 
@@ -369,31 +369,31 @@ exec my-daemon --foreground
 
 ### Built-in Services
 
-| Service | Description |
-|---------|-------------|
-| `moltbot` | OpenClaw gateway |
-| `ngrok` | ngrok tunnel (if enabled) |
-| `tailscale` | Tailscale daemon (if enabled) |
-| `backup` | Restic backup service - creates snapshots (if enabled) |
-| `prune` | Restic prune service - cleans old snapshots (if enabled) |
-| `crond` | Cron daemon for scheduled tasks |
-| `sshd` | SSH server (if enabled) |
+| Service     | Description                                              |
+| ----------- | -------------------------------------------------------- |
+| `moltbot`   | OpenClaw gateway                                         |
+| `ngrok`     | ngrok tunnel (if enabled)                                |
+| `tailscale` | Tailscale daemon (if enabled)                            |
+| `backup`    | Restic backup service - creates snapshots (if enabled)   |
+| `prune`     | Restic prune service - cleans old snapshots (if enabled) |
+| `crond`     | Cron daemon for scheduled tasks                          |
+| `sshd`      | SSH server (if enabled)                                  |
 
 ---
 
 ## Available Regions
 
-| Code | Location |
-|------|----------|
-| `nyc` | New York |
-| `atl` | Atlanta |
-| `ams` | Amsterdam |
-| `sfo` | San Francisco |
-| `sgp` | Singapore |
-| `lon` | London |
-| `fra` | Frankfurt |
-| `blr` | Bangalore |
-| `syd` | Sydney |
+| Code  | Location          |
+| ----- | ----------------- |
+| `nyc` | New York          |
+| `atl` | Atlanta           |
+| `ams` | Amsterdam         |
+| `sfo` | San Francisco     |
+| `sgp` | Singapore         |
+| `lon` | London            |
+| `fra` | Frankfurt         |
+| `blr` | Bangalore         |
+| `syd` | Sydney            |
 | `tor` | Toronto (default) |
 
 ---

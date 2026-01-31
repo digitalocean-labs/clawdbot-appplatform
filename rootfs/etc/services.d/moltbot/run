@@ -1,13 +1,11 @@
-#!/command/with-contenv bash
+#!/bin/bash
 # OpenClaw gateway service
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix OPENCLAW_ MOLTBOT_
 
 echo "[moltbot] Starting moltbot gateway..."
 
-# Run as moltbot user with proper environment
 export HOME=/home/moltbot
-exec s6-setuidgid moltbot bash -c '
-  export HOME=/home/moltbot
-  source /home/moltbot/.bashrc
-  source /home/moltbot/.profile
-  moltbot gateway --allow-unconfigured
-' > /proc/1/fd/1 2>&1
+exec s6-envdir /run/s6/container_environment/OPENCLAW_/ \
+  s6-envdir /run/s6/container_environment/MOLTBOT_/ \
+  s6-setuidgid moltbot bash -l -c 'moltbot gateway --allow-unconfigured'

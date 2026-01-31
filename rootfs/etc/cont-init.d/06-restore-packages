@@ -1,13 +1,12 @@
 #!/command/with-contenv bash
 # Restore and reinstall user-installed packages from backup
+source /etc/s6-overlay/lib/env-utils.sh
 
 CONFIG_FILE="/etc/moltbot/backup.yaml"
 DPKG_SELECTIONS="/etc/moltbot/dpkg-selections"
 
-# Source s6 container environment
-for f in /run/s6/container_environment/*; do
-  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
-done
+# Load RESTIC_ vars
+source_env_prefix RESTIC_
 
 # Check if persistence is configured
 if [ -z "$RESTIC_REPOSITORY" ] || [ -z "$RESTIC_PASSWORD" ]; then

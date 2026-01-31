@@ -1,7 +1,16 @@
 #!/command/with-contenv bash
 # Setup restic for DO Spaces backup
+source /etc/s6-overlay/lib/env-utils.sh
+
+persist_env_prefix RESTIC_ 
+
+persist_env_var RESTIC_ \
+  RESTIC_HOST="${HOSTNAME}" \
+
+source_env_prefix RESTIC_
 
 CONFIG_FILE="/etc/moltbot/backup.yaml"
+
 
 # Skip if persistence not configured
 if [ -z "$RESTIC_SPACES_ACCESS_KEY_ID" ] || [ -z "$RESTIC_SPACES_BUCKET" ]; then
@@ -11,8 +20,6 @@ fi
 
 echo "[setup-restic] Configuring restic for DO Spaces..."
 
-export RESTIC_HOST=${STABLE_HOSTNAME:-moltbot}
-
 
 # Set restic password (from env or generate a persistent one)
 if [ -z "$RESTIC_PASSWORD" ]; then
@@ -20,7 +27,7 @@ if [ -z "$RESTIC_PASSWORD" ]; then
   if [ -f "$MOLTBOT_STATE_DIR/.restic-password" ]; then
     RESTIC_PASSWORD=$(cat "$MOLTBOT_STATE_DIR/.restic-password")
   else
-    RESTIC_PASSWORD="$RESTIC_PASSWORD"
+    RESTIC_PASSWORD=$(openssl rand -base64 32)
     mkdir -p "$MOLTBOT_STATE_DIR"
     echo "$RESTIC_PASSWORD" > "$MOLTBOT_STATE_DIR/.restic-password"
     chmod 600 "$MOLTBOT_STATE_DIR/.restic-password"
@@ -64,11 +71,7 @@ export AWS_ACCESS_KEY_ID="$RESTIC_SPACES_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$
 # Ensure environment directory exists
 mkdir -p /run/s6/container_environment
 
-while IFS='=' read -r var value; do
-  echo "$value" > "/run/s6/container_environment/$var" || {
-  echo "[tailscale] Warning: Failed to write $var" >&2
-}
-done < <(env | grep -E '^RESTIC_')
+persist_env_prefix RESTIC_
 
 # Initialize restic repo if it doesn't exist
 echo "[setup-restic] Checking if restic repository exists..."

@@ -4,8 +4,8 @@
 set -e
 
 # Validate mutual exclusivity of ngrok and tailscale
-if [ "${ENABLE_NGROK:-false}" = "true" ] && [ "${ENABLE_TAILSCALE:-false}" = "true" ]; then
-  echo "[generate-config] WARNING: Both ENABLE_NGROK and ENABLE_TAILSCALE are true."
+if [ "${ENABLE_NGROK:-false}" = "true" ] && [ "${TAILSCALE_ENABLE:-false}" = "true" ]; then
+  echo "[generate-config] WARNING: Both ENABLE_NGROK and TAILSCALE_ENABLE are true."
   echo "[generate-config] This doesn't make sense - ngrok is public, Tailscale is private."
   echo "[generate-config] Defaulting to Tailscale (disable ENABLE_NGROK to silence this)."
 fi
@@ -76,7 +76,7 @@ if [ "${ENABLE_UI:-true}" = "false" ]; then
 fi
 
 # Add Tailscale config when enabled
-if [ "${ENABLE_TAILSCALE:-false}" = "true" ]; then
+if [ "${TAILSCALE_ENABLE:-false}" = "true" ]; then
   echo "[generate-config] Adding Tailscale serve config"
   jq '.gateway.tailscale.resetOnExit = true | .gateway.tailscale.mode = "serve" | .gateway.auth.allowTailscale = true' "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 fi

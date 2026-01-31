@@ -1,0 +1,19 @@
+#!/command/with-contenv bash
+source /etc/s6-overlay/lib/env-utils.sh
+
+ENV_BASE="/run/s6/container_environment"
+
+# Dump all env vars to container environment and set permissions
+s6-dumpenv -m 0600 "$ENV_BASE"
+
+# Add HOSTNAME as a global variable
+persist_env_global HOSTNAME="${STABLE_HOSTNAME}"
+
+# Organize by prefix into subdirectories
+persist_env_prefix RESTIC_ OPENCLAW_ MOLTBOT_ NGROK_
+
+# Individually persist specific vars
+persist_env_var OPENCLAW_ GRADIENT_API_KEY=change-me
+
+# Apply runtime permissions
+apply_permissions

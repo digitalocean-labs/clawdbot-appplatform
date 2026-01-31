@@ -1,10 +1,7 @@
-#!/command/with-contenv bash
+#!/bin/bash
 # Periodic backup service using restic
-
-# Source s6 container environment (ensures vars are available)
-for f in /run/s6/container_environment/RESTIC_*; do
-  [ -f "$f" ] && export "$(basename $f)"="$(cat $f)"
-done
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix RESTIC_
 
 CONFIG_FILE="/etc/moltbot/backup.yaml"
 
@@ -28,5 +25,6 @@ echo "[backup] Starting backup loop (every ${BACKUP_INTERVAL}s)..."
 
 while true; do
   sleep "$BACKUP_INTERVAL"
-  /usr/local/bin/restic-backup
+  s6-envdir /run/s6/container_environment/RESTIC_/ \
+    /usr/local/bin/restic-backup
 done

@@ -1,0 +1,34 @@
+#!/command/with-contenv bash
+# Setup Tailscale
+source /etc/s6-overlay/lib/env-utils.sh
+
+echo "[tailscale] Setting up Tailscale"
+
+if [ "${TAILSCALE_ENABLE:-false}" != "true" ]; then
+  echo "[tailscale] Disabled (set TAILSCALE_ENABLE=true to enable)"
+  exit 0
+fi
+persist_env_prefix TS_ 
+
+# Persist TS_ vars with defaults
+persist_env_var TS_ \
+  TS_HOSTNAME="${HOSTNAME:-moltbot}" \
+  TS_SOCKET=/tmp/tailscaled.sock \
+  TS_USERSPACE=true \
+  TS_STATE_DIR=/data/tailscale \
+  TAILSCALE_ENABLE="${TAILSCALE_ENABLE:-false}"
+
+# Also persist any existing TS_ vars from environment
+persist_env_prefix TS_
+
+# Secure TS_ environment files
+chown root:root /run/s6/container_environment/TS_/* 2>/dev/null || true
+chmod 400 /run/s6/container_environment/TS_/* 2>/dev/null || true
+
+# Create state directory
+TS_STATE_DIR="${TS_STATE_DIR:-/data/tailscale}"
+mkdir -p "$TS_STATE_DIR"
+chown -R root:root "$TS_STATE_DIR"
+chmod 0700 "$TS_STATE_DIR"
+
+echo "[tailscale] Setup complete"
