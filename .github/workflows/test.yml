@@ -99,24 +99,14 @@ jobs:
 
       - name: Copy test configuration
         env:
-          DO_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
-          DO_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
-          BUCKET_NAME: ${{ steps.spaces-bucket.outputs.BUCKET_NAME }}
-          SPACES_ENDPOINT: ${{ steps.spaces-bucket.outputs.SPACES_ENDPOINT }}
+          RESTIC_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
+          RESTIC_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
+          RESTIC_SPACES_ENDPOINT: ${{ steps.spaces-bucket.outputs.SPACES_ENDPOINT }}
+          RESTIC_SPACES_BUCKET: ${{ steps.spaces-bucket.outputs.BUCKET_NAME }}
+          RESTIC_PASSWORD: test-password-${{ github.run_id }}
         run: |
           echo "Testing configuration: ${{ matrix.config }}"
-          cp example_configs/${{ matrix.config }}.env .env
-
-          # Inject Spaces credentials for persistence test
-          if [ "${{ matrix.config }}" = "persistence-enabled" ] && [ -n "$BUCKET_NAME" ]; then
-            echo "" >> .env  # Ensure newline before appending
-            echo "RESTIC_SPACES_ACCESS_KEY_ID=$DO_SPACES_ACCESS_KEY_ID" >> .env
-            echo "RESTIC_SPACES_SECRET_ACCESS_KEY=$DO_SPACES_SECRET_ACCESS_KEY" >> .env
-            echo "RESTIC_SPACES_ENDPOINT=$SPACES_ENDPOINT" >> .env
-            echo "RESTIC_SPACES_BUCKET=$BUCKET_NAME" >> .env
-            echo "RESTIC_PASSWORD=test-password-$(date +%s)" >> .env
-          fi
-
+          bash -c 'source tests/lib.sh && switch_config ${{ matrix.config }}'
           echo "--- Configuration contents ---"
           cat .env
 
@@ -155,6 +145,28 @@ jobs:
           else
             echo "No test script found for ${{ matrix.config }}, skipping"
           fi
+
+      - name: Dump final container state
+        if: always()
+        run: |
+          echo "=== Container status ==="
+          docker ps -a --filter name=${{ matrix.config }}
+          echo ""
+          echo "=== Process list ==="
+          docker exec ${{ matrix.config }} ps aux 2>/dev/null || echo "Container not running"
+          echo ""
+          echo "=== Service status ==="
+          docker exec ${{ matrix.config }} ls -la /run/service/ 2>/dev/null || echo "No services"
+          for svc in $(docker exec ${{ matrix.config }} ls /run/service/ 2>/dev/null); do
+            echo -n "$svc: "
+            docker exec ${{ matrix.config }} /command/s6-svstat "/run/service/$svc" 2>/dev/null || echo "unknown"
+          done
+          echo ""
+          echo "=== Container environment ==="
+          docker exec ${{ matrix.config }} bash -c 'for f in /run/s6/container_environment/*; do [ -f "$f" ] && echo "$(basename $f)=$(cat $f)"; done' 2>/dev/null || echo "No environment"
+          echo ""
+          echo "=== Final container logs ==="
+          docker logs ${{ matrix.config }} 2>&1 || true
 
       - name: Cleanup Spaces bucket
         if: always() && matrix.config == 'persistence-enabled' && steps.spaces-bucket.outputs.BUCKET_NAME != ''

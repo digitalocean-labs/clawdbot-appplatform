@@ -116,22 +116,14 @@ docker exec "$CONTAINER" ss -tlnp | grep -q ":<port> "
 
 ```bash
 # Test a specific configuration
-cp example_configs/minimal.env .env
-make rebuild
+make test CONFIG=minimal    # Build, start, and test
 
-# Wait for services to start
-sleep 10
+# Run all configurations
+make test-all               # Loops through all configs
 
-# Run the test script (container name = config name = "minimal")
-./tests/minimal/test.sh minimal
-
-# Or check manually
-docker logs minimal
-docker exec minimal ps aux
-docker exec minimal s6-rc -a list
-
-# Clean up
-docker compose down
+# Debugging
+make logs                   # Follow container logs
+make shell                  # Shell into container
 ```
 
 ### Existing Test Configurations

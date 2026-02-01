@@ -88,18 +88,14 @@ Optional DO Spaces backup via [Restic](https://restic.net/) when `ENABLE_SPACES=
 
 ## Testing
 
-CI runs on push/PR to main via GitHub Actions (`.github/workflows/test.yml`):
-
-- Builds the Docker image
-- Starts container with features disabled
-- Verifies container stays running
-
-Run locally with `make rebuild` to test changes before pushing.
+See `tests/CLAUDE.md` for test system details. Run locally with `make rebuild` before pushing.
 
 ## Gotchas
 
 - **Use `openclaw` wrapper in console sessions** - The wrapper in `/usr/local/bin/openclaw` runs commands as the correct user with proper environment. Running the binary directly as root won't work.
 - **Service restarts**: Use `/command/s6-svc -r /run/service/<name>` to restart services (openclaw, ngrok, tailscale, etc.)
+- **s6 commands not in PATH**: Use full paths: `/command/s6-svok`, `/command/s6-svstat`, `/command/s6-svc`
+- **Checking service status**: `/command/s6-svok /run/service/<name>` returns 0 if supervised; `/command/s6-svstat /run/service/<name>` shows up/down state
 - **See CHEATSHEET.md** for detailed command reference and troubleshooting
 
 ## Development

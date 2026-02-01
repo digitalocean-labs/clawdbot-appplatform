@@ -8,6 +8,43 @@ get_project_root() {
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(get_project_root)}"
 
+# Switch to a test config while preserving secrets from current .env or environment
+# Usage: switch_config <config-name>
+switch_config() {
+    local config=$1
+    local env_file="$PROJECT_ROOT/.env"
+    local config_file="$PROJECT_ROOT/example_configs/${config}.env"
+
+    if [ ! -f "$config_file" ]; then
+        echo "error: Config file not found: $config_file"
+        return 1
+    fi
+
+    # Save secrets from current .env (KEY, SECRET, PASSWORD, TOKEN, AUTHKEY, plus RESTIC_SPACES_*)
+    local secrets=""
+    if [ -f "$env_file" ]; then
+        secrets=$(grep -E '^([A-Z_]*(KEY|SECRET|PASSWORD|TOKEN|AUTHKEY|KEY_ID)=|RESTIC_SPACES_)' "$env_file" 2>/dev/null || true)
+    fi
+
+    # Copy config
+    cp "$config_file" "$env_file"
+
+    # Append secrets from .env
+    if [ -n "$secrets" ]; then
+        echo "" >> "$env_file"
+        echo "$secrets" >> "$env_file"
+    fi
+
+    # Also append secrets from environment variables (for CI)
+    {
+        [ -n "$RESTIC_SPACES_ACCESS_KEY_ID" ] && echo "RESTIC_SPACES_ACCESS_KEY_ID=$RESTIC_SPACES_ACCESS_KEY_ID"
+        [ -n "$RESTIC_SPACES_SECRET_ACCESS_KEY" ] && echo "RESTIC_SPACES_SECRET_ACCESS_KEY=$RESTIC_SPACES_SECRET_ACCESS_KEY"
+        [ -n "$RESTIC_SPACES_ENDPOINT" ] && echo "RESTIC_SPACES_ENDPOINT=$RESTIC_SPACES_ENDPOINT"
+        [ -n "$RESTIC_SPACES_BUCKET" ] && echo "RESTIC_SPACES_BUCKET=$RESTIC_SPACES_BUCKET"
+        [ -n "$RESTIC_PASSWORD" ] && echo "RESTIC_PASSWORD=$RESTIC_PASSWORD"
+    } >> "$env_file"
+}
+
 # Wait for container to be ready (including s6-overlay init)
 # Usage: wait_for_container <container-name> [max-attempts]
 wait_for_container() {
@@ -23,7 +60,7 @@ wait_for_container() {
             break
         fi
         echo "  Attempt $attempt/$max_attempts..."
-        sleep 2
+        sleep 0.5
         attempt=$((attempt + 1))
     done
 
@@ -32,10 +69,30 @@ wait_for_container() {
         return 1
     fi
 
-    # Give s6 time to complete init scripts (restore can take 30-60s for large home directories)
+    # Wait for s6 init to complete (services to be supervised)
     echo "✓ Container is responsive (waiting for init to complete...)"
-    sleep 45
-    return 0
+    local init_attempts=0
+    local max_init_attempts=18  # 18 * 5s = 90s max
+    while [ $init_attempts -lt $max_init_attempts ]; do
+        # Check if s6-svscan has services (init scripts finished, services starting)
+        local svc_count
+        svc_count=$(docker exec "$container" ls -1 /run/service 2>/dev/null | wc -l)
+        if [ "$svc_count" -gt 0 ]; then
+            echo "✓ s6 init complete ($svc_count services)"
+            return 0
+        fi
+        sleep 5
+        init_attempts=$((init_attempts + 1))
+        echo "  Waiting for s6 init... ($((init_attempts * 5))s)"
+        # Show recent logs to help debug slow init
+        echo "  --- Recent container logs ---"
+        docker logs --tail 5 "$container" 2>&1 | sed 's/^/  /'
+    done
+
+    echo "error: s6 init did not complete"
+    echo "--- Container logs ---"
+    docker logs --tail 20 "$container" 2>&1
+    return 1
 }
 
 # Wait for an s6 service to be up
@@ -49,17 +106,23 @@ wait_for_service() {
     echo "Waiting for $service service..."
 
     while [ $attempt -le $max_attempts ]; do
+        # Check if service is supervised
         if docker exec "$container" /command/s6-svok "/run/service/$service" 2>/dev/null; then
-            echo "✓ $service service running"
-            return 0
+            # Check if service is actually up (not just supervised)
+            local status
+            status=$(docker exec "$container" /command/s6-svstat "/run/service/$service" 2>/dev/null || echo "down")
+            if echo "$status" | grep -q "^up"; then
+                echo "✓ $service service running"
+                return 0
+            fi
         fi
         echo "  Attempt $attempt/$max_attempts..."
-        sleep 2
+        sleep 0.5
         attempt=$((attempt + 1))
     done
 
     echo "error: $service service did not start"
-    docker exec "$container" /command/s6-svok "/run/service/$service" 2>&1 || true
+    docker exec "$container" /command/s6-svstat "/run/service/$service" 2>&1 || true
     return 1
 }
 
@@ -79,7 +142,7 @@ wait_for_process() {
         if [ $attempt -eq $max_attempts ]; then
             return 1
         fi
-        sleep 2
+        sleep 0.5
         attempt=$((attempt + 1))
     done
     return 1
@@ -125,17 +188,27 @@ assert_process_running() {
     return 0
 }
 
-# Check that an s6 service is supervised (up)
+# Check that an s6 service is up (supervised and running)
 # Usage: assert_service_up <container-name> <service-name>
 assert_service_up() {
     local container=$1
     local service=$2
 
+    # First check if supervised
     if ! docker exec "$container" /command/s6-svok "/run/service/$service" 2>/dev/null; then
         echo "error: $service service not supervised but should be"
         return 1
     fi
-    echo "✓ $service service supervised"
+
+    # Then check if actually up
+    local status
+    status=$(docker exec "$container" /command/s6-svstat "/run/service/$service" 2>/dev/null || echo "down")
+    if ! echo "$status" | grep -q "^up"; then
+        echo "error: $service service supervised but not up"
+        echo "  status: $status"
+        return 1
+    fi
+    echo "✓ $service service up"
     return 0
 }
 
