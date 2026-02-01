@@ -69,24 +69,26 @@ wait_for_container() {
         return 1
     fi
 
-    # Wait for s6 init to complete (services to be supervised)
+    # Wait for s6 init to complete (at least one service must be "up")
     echo "✓ Container is responsive (waiting for init to complete...)"
     local init_attempts=0
-    local max_init_attempts=18  # 18 * 5s = 90s max
+    local max_init_attempts=60  # 60 * 3s = 180s max
     while [ $init_attempts -lt $max_init_attempts ]; do
-        # Check if s6-svscan has services (init scripts finished, services starting)
-        local svc_count
-        svc_count=$(docker exec "$container" ls -1 /run/service 2>/dev/null | wc -l)
-        if [ "$svc_count" -gt 0 ]; then
-            echo "✓ s6 init complete ($svc_count services)"
+        # Check if any service is actually "up" (not just supervised)
+        local up_count
+        up_count=$(docker exec "$container" bash -c 'for s in /run/service/*/; do /command/s6-svstat "$s" 2>/dev/null | grep -q "^up" && echo up; done | wc -l' 2>/dev/null)
+        if [ "$up_count" -gt 0 ]; then
+            echo "✓ s6 init complete ($up_count services up)"
             return 0
         fi
-        sleep 5
+        sleep 3
         init_attempts=$((init_attempts + 1))
-        echo "  Waiting for s6 init... ($((init_attempts * 5))s)"
-        # Show recent logs to help debug slow init
-        echo "  --- Recent container logs ---"
-        docker logs --tail 5 "$container" 2>&1 | sed 's/^/  /'
+        echo "  Waiting for s6 init... ($((init_attempts * 3))s)"
+        # Show recent logs every 5 attempts
+        if [ $((init_attempts % 5)) -eq 0 ]; then
+            echo "  --- Recent container logs ---"
+            docker logs --tail 3 "$container" 2>&1 | sed 's/^/  /'
+        fi
     done
 
     echo "error: s6 init did not complete"
