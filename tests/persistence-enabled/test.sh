@@ -62,11 +62,12 @@ echo "✓ Snapshot created ($SNAPSHOT_COUNT total)"
 # Restart container to test restore
 restart_container "$CONTAINER"
 
-# Wait for init scripts to complete and dump logs for debugging
-sleep 15
-echo "--- Container logs after restart (init scripts) ---"
-docker logs "$CONTAINER" 2>&1 | grep -E "cont-init:|restore-state|setup-restic" || true
-echo "--- End container logs ---"
+# Wait for init scripts to complete by waiting for backup service to be ready
+wait_for_service "$CONTAINER" "backup" || { echo "error: Backup service not ready after restart"; exit 1; }
+
+echo "--- Container logs after restart ---"
+docker logs "$CONTAINER" 2>&1 | grep -E "restore-state" || true
+echo "---"
 
 # Verify test data was restored
 RESTORED_CONTENT=$(docker exec "$CONTAINER" cat "$TEST_FILE" 2>/dev/null || echo "")
