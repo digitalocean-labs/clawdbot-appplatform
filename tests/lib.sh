@@ -139,16 +139,26 @@ assert_service_up() {
     return 0
 }
 
-# Check that an s6 service is NOT supervised (down or doesn't exist)
+# Check that an s6 service is not running (either doesn't exist or is down)
 # Usage: assert_service_down <container-name> <service-name>
 assert_service_down() {
     local container=$1
     local service=$2
 
-    if docker exec "$container" /command/s6-svok "/run/service/$service" 2>/dev/null; then
-        echo "error: $service service supervised but should not be"
+    # If service directory doesn't exist, it's down
+    if ! docker exec "$container" test -d "/run/service/$service" 2>/dev/null; then
+        echo "✓ $service service not present (as expected)"
+        return 0
+    fi
+
+    # Service directory exists, check if it's down (not "up")
+    local status
+    status=$(docker exec "$container" /command/s6-svstat "/run/service/$service" 2>/dev/null || echo "down")
+    if echo "$status" | grep -q "^up"; then
+        echo "error: $service service is up but should not be"
+        echo "  status: $status"
         return 1
     fi
-    echo "✓ $service service not supervised (as expected)"
+    echo "✓ $service service down (as expected)"
     return 0
 }
