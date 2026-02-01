@@ -143,3 +143,56 @@ docker compose down
 | `ui-disabled.env` | CLI-only mode |
 | `ssh-and-ui.env` | Multiple services together |
 | `all-optional-disabled.env` | All features explicitly false |
+| `persistence-enabled.env` | DO Spaces backup/restore (requires secrets) |
+
+### Persistence Test
+
+The `persistence-enabled` test validates that data persists across container restarts using DigitalOcean Spaces and Restic.
+
+**What it tests:**
+1. Creates a temporary DO Spaces bucket
+2. Starts container with persistence enabled
+3. Creates test data in backed-up paths
+4. Triggers a backup to Spaces
+5. Stops and removes container
+6. Starts a new container (simulating redeploy)
+7. Verifies test data was restored from backup
+8. Cleans up the temporary bucket
+
+**Required CI Secrets:**
+
+To run the persistence test in CI, add these secrets to your GitHub repository:
+
+| Secret | Description |
+|--------|-------------|
+| `DIGITALOCEAN_ACCESS_TOKEN` | DO API token with Spaces read/write access |
+| `DO_SPACES_ACCESS_KEY_ID` | Spaces access key ID |
+| `DO_SPACES_SECRET_ACCESS_KEY` | Spaces secret access key |
+
+If secrets are not configured, the test will be skipped (not failed).
+
+**Running Locally:**
+
+```bash
+# Set required environment variables
+export DIGITALOCEAN_ACCESS_TOKEN="your-do-token"
+export DO_SPACES_ACCESS_KEY_ID="your-spaces-key"
+export DO_SPACES_SECRET_ACCESS_KEY="your-spaces-secret"
+
+# Run the persistence test
+./tests/persistence-enabled/test.sh persistence-enabled
+```
+
+**Creating DO Spaces Credentials:**
+
+```bash
+# Install doctl if needed
+brew install doctl
+
+# Authenticate
+doctl auth init
+
+# Create Spaces access keys
+doctl spaces keys create --name "openclaw-ci-test"
+# Note the Access Key and Secret Key from the output
+```
