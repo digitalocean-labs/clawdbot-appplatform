@@ -69,16 +69,14 @@ wait_for_container() {
         return 1
     fi
 
-    # Wait for s6 init to complete (at least one service must be "up")
+    # Wait for s6 init to complete (crond service must be up - starts after all init scripts)
     echo "✓ Container is responsive (waiting for init to complete...)"
     local init_attempts=0
     local max_init_attempts=60  # 60 * 3s = 180s max
     while [ $init_attempts -lt $max_init_attempts ]; do
-        # Check if any service is actually "up" (not just supervised)
-        local up_count
-        up_count=$(docker exec "$container" bash -c 'for s in /run/service/*/; do /command/s6-svstat "$s" 2>/dev/null | grep -q "^up" && echo up; done | wc -l' 2>/dev/null)
-        if [ "$up_count" -gt 0 ]; then
-            echo "✓ s6 init complete ($up_count services up)"
+        # Check if crond service exists and is up (always enabled, starts after init)
+        if docker exec "$container" /command/s6-svstat /run/service/crond 2>/dev/null | grep -q "^up"; then
+            echo "✓ s6 init complete (crond up)"
             return 0
         fi
         sleep 3
