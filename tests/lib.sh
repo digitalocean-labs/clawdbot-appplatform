@@ -8,7 +8,7 @@ get_project_root() {
 
 PROJECT_ROOT="${PROJECT_ROOT:-$(get_project_root)}"
 
-# Wait for container to be ready
+# Wait for container to be ready (including s6-overlay init)
 # Usage: wait_for_container <container-name> [max-attempts]
 wait_for_container() {
     local container=$1
@@ -17,17 +17,33 @@ wait_for_container() {
 
     echo "Waiting for container $container to be ready..."
 
+    # First wait for container to accept commands
     while [ $attempt -le $max_attempts ]; do
         if docker exec "$container" true 2>/dev/null; then
-            echo "✓ Container is responsive"
-            return 0
+            break
         fi
         echo "  Attempt $attempt/$max_attempts..."
         sleep 2
         attempt=$((attempt + 1))
     done
 
-    echo "error: Container did not become ready"
+    if [ $attempt -gt $max_attempts ]; then
+        echo "error: Container did not become ready"
+        return 1
+    fi
+
+    # Then wait for s6 services to be initialized
+    attempt=1
+    while [ $attempt -le $max_attempts ]; do
+        if docker exec "$container" test -d /run/service 2>/dev/null; then
+            echo "✓ Container is responsive"
+            return 0
+        fi
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+
+    echo "error: s6 services directory not found"
     return 1
 }
 
