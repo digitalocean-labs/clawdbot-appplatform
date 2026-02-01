@@ -60,21 +60,54 @@ jobs:
         run: docker load -i /tmp/openclaw-test.tar
 
       - name: Install s3cmd
+        if: matrix.config == 'persistence-enabled'
         run: sudo apt-get update && sudo apt-get install -y s3cmd
 
-      - name: Copy test configuration
+      - name: Create Spaces bucket for persistence test
+        if: matrix.config == 'persistence-enabled'
+        id: spaces-bucket
+        env:
+          DO_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
+          DO_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
         run: |
-          cat > .env << 'EOF'
-          TAILSCALE_ENABLE=false
-          ENABLE_NGROK=false
-          ENABLE_SPACES=false
-          ENABLE_SSH=false
-          STABLE_HOSTNAME=openclaw-test
-          # Keep container running even if services fail (0=continue, 1=SIGTERM, 2=SIGKILL)
-          S6_BEHAVIOUR_IF_STAGE2_FAILS=0
-          EOF
+          if [ -z "$DO_SPACES_ACCESS_KEY_ID" ] || [ -z "$DO_SPACES_SECRET_ACCESS_KEY" ]; then
+            echo "SKIP_PERSISTENCE=true" >> $GITHUB_OUTPUT
+            echo "Skipping: DO_SPACES credentials not configured"
+            exit 0
+          fi
+          BUCKET_NAME="openclaw-test-$(date +%s)-$$"
+          SPACES_REGION="sfo3"
+          SPACES_ENDPOINT="${SPACES_REGION}.digitaloceanspaces.com"
+
+          s3cmd --access_key="$DO_SPACES_ACCESS_KEY_ID" \
+                --secret_key="$DO_SPACES_SECRET_ACCESS_KEY" \
+                --host="$SPACES_ENDPOINT" \
+                --host-bucket="%(bucket)s.$SPACES_ENDPOINT" \
+                mb "s3://$BUCKET_NAME"
+
+          echo "BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_OUTPUT
+          echo "SPACES_ENDPOINT=$SPACES_ENDPOINT" >> $GITHUB_OUTPUT
+          echo "Created bucket: $BUCKET_NAME"
+
+      - name: Copy test configuration
+        env:
+          DO_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
+          DO_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
+          BUCKET_NAME: ${{ steps.spaces-bucket.outputs.BUCKET_NAME }}
+          SPACES_ENDPOINT: ${{ steps.spaces-bucket.outputs.SPACES_ENDPOINT }}
+        run: |
           echo "Testing configuration: ${{ matrix.config }}"
           cp example_configs/${{ matrix.config }}.env .env
+
+          # Inject Spaces credentials for persistence test
+          if [ "${{ matrix.config }}" = "persistence-enabled" ] && [ -n "$BUCKET_NAME" ]; then
+            echo "RESTIC_SPACES_ACCESS_KEY_ID=$DO_SPACES_ACCESS_KEY_ID" >> .env
+            echo "RESTIC_SPACES_SECRET_ACCESS_KEY=$DO_SPACES_SECRET_ACCESS_KEY" >> .env
+            echo "RESTIC_SPACES_ENDPOINT=$SPACES_ENDPOINT" >> .env
+            echo "RESTIC_SPACES_BUCKET=$BUCKET_NAME" >> .env
+            echo "RESTIC_PASSWORD=test-password-$(date +%s)" >> .env
+          fi
+
           echo "--- Configuration contents ---"
           cat .env
 
@@ -113,6 +146,21 @@ jobs:
           else
             echo "No test script found for ${{ matrix.config }}, skipping"
           fi
+
+      - name: Cleanup Spaces bucket
+        if: always() && matrix.config == 'persistence-enabled' && steps.spaces-bucket.outputs.BUCKET_NAME != ''
+        env:
+          DO_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
+          DO_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
+          BUCKET_NAME: ${{ steps.spaces-bucket.outputs.BUCKET_NAME }}
+          SPACES_ENDPOINT: ${{ steps.spaces-bucket.outputs.SPACES_ENDPOINT }}
+        run: |
+          echo "Cleaning up Spaces bucket: $BUCKET_NAME"
+          s3cmd --access_key="$DO_SPACES_ACCESS_KEY_ID" \
+                --secret_key="$DO_SPACES_SECRET_ACCESS_KEY" \
+                --host="$SPACES_ENDPOINT" \
+                --host-bucket="%(bucket)s.$SPACES_ENDPOINT" \
+                rb --recursive "s3://$BUCKET_NAME" || true
 
       - name: Cleanup
         if: always()
