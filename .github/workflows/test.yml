@@ -142,15 +142,29 @@ jobs:
           scripts=($(ls tests/${{ matrix.config }}/*.sh 2>/dev/null | sort))
           total=${#scripts[@]}
           current=0
+          failed=0
+
+          echo "## Test Results: ${{ matrix.config }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Script | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
           for script in "${scripts[@]}"; do
             if [ -x "$script" ]; then
               current=$((current + 1))
               name=$(basename "$script")
               echo "::group::[$current/$total] $name"
-              "$script" ${{ matrix.config }} || { echo "::endgroup::"; exit 1; }
+              if "$script" ${{ matrix.config }}; then
+                echo "| $name | ✅ |" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "| $name | ❌ |" >> $GITHUB_STEP_SUMMARY
+                failed=1
+              fi
               echo "::endgroup::"
             fi
           done
+
+          exit $failed
 
       - name: Dump final container state
         if: always()
