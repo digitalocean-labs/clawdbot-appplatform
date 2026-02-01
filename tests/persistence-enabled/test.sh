@@ -11,13 +11,18 @@ set -e
 CONTAINER=${1:?Usage: $0 <container-name>}
 source "$(dirname "$0")/../lib.sh"
 
+# Helper to run commands with restic environment loaded
+run_with_restic_env() {
+    docker exec "$CONTAINER" bash -c "source /etc/s6-overlay/lib/env-utils.sh && source_env_prefix RESTIC_ && $*"
+}
+
 echo "Testing persistence-enabled configuration (container: $CONTAINER)..."
 
 # Container should be running
 docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
 
 # Check if persistence is actually configured (CI may skip if no credentials)
-if ! docker exec "$CONTAINER" printenv RESTIC_SPACES_BUCKET >/dev/null 2>&1; then
+if ! docker exec "$CONTAINER" test -f /run/s6/container_environment/RESTIC_SPACES_BUCKET 2>/dev/null; then
     echo "SKIP: Persistence not configured (RESTIC_SPACES_BUCKET not set)"
     echo "Set DO_SPACES_ACCESS_KEY_ID and DO_SPACES_SECRET_ACCESS_KEY secrets to enable"
     exit 0
@@ -27,7 +32,7 @@ fi
 wait_for_service "$CONTAINER" "backup" || exit 1
 
 # Verify restic repository is initialized
-if ! docker exec "$CONTAINER" restic snapshots --latest 1 >/dev/null 2>&1; then
+if ! run_with_restic_env "restic snapshots --latest 1" >/dev/null 2>&1; then
     echo "error: Restic repository not initialized"
     exit 1
 fi
@@ -47,7 +52,7 @@ fi
 echo "✓ Backup completed"
 
 # Verify snapshot was created
-SNAPSHOT_COUNT=$(docker exec "$CONTAINER" bash -c 'restic snapshots --json 2>/dev/null | jq length')
+SNAPSHOT_COUNT=$(run_with_restic_env "restic snapshots --json" 2>/dev/null | jq length)
 if [ "$SNAPSHOT_COUNT" -lt 1 ]; then
     echo "error: No snapshots found after backup"
     exit 1
