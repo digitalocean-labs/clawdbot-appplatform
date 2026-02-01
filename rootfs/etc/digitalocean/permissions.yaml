@@ -127,6 +127,10 @@ permissions:
     user: root
     group: root
     mode: "0755"
+  - path: /usr/local/bin/motd
+    user: root
+    group: root
+    mode: "0755"
 
   # User SSH directories
   - path: /home/ubuntu/.ssh
