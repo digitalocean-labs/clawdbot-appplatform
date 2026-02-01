@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test: UI disabled configuration
+# Test: UI disabled in configuration
 # Verifies gateway runs in CLI-only mode
 
 set -e
@@ -7,7 +7,7 @@ set -e
 CONTAINER=${1:?Usage: $0 <container-name>}
 source "$(dirname "$0")/../lib.sh"
 
-echo "Testing ui-disabled configuration (container: $CONTAINER)..."
+echo "Testing UI disabled config (container: $CONTAINER)..."
 
 # Container should be running
 docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
@@ -22,4 +22,4 @@ if docker exec "$CONTAINER" cat /data/.openclaw/openclaw.json 2>/dev/null | grep
 fi
 echo "✓ UI disabled in config"
 
-echo "ui-disabled tests passed"
+echo "UI config tests passed"

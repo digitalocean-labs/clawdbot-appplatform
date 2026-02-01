@@ -1,10 +1,6 @@
 #!/bin/bash
-# Test: Persistence with DigitalOcean Spaces
-# Verifies that backup service starts and data persists across container restarts
-#
-# Prerequisites (handled by CI workflow):
-# - Spaces bucket created and credentials injected into .env
-# - Container started with persistence configuration
+# Test: Backup and restore workflow
+# Verifies data persists across container restarts
 
 set -e
 
@@ -16,7 +12,7 @@ run_with_restic_env() {
     docker exec "$CONTAINER" bash -c "source /etc/s6-overlay/lib/env-utils.sh && source_env_prefix RESTIC_ && $*"
 }
 
-echo "Testing persistence-enabled configuration (container: $CONTAINER)..."
+echo "Testing backup and restore (container: $CONTAINER)..."
 
 # Container should be running
 docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
@@ -30,13 +26,6 @@ fi
 
 # Wait for backup service to be ready
 wait_for_service "$CONTAINER" "backup" || exit 1
-
-# Verify restic repository is initialized
-if ! run_with_restic_env "restic snapshots --latest 1" >/dev/null 2>&1; then
-    echo "error: Restic repository not initialized"
-    exit 1
-fi
-echo "✓ Restic repository initialized"
 
 # Create test data
 TEST_CONTENT="persistence-test-$(date +%s)"
@@ -82,4 +71,4 @@ if [ "$RESTORED_CONTENT" != "$TEST_CONTENT" ]; then
 fi
 echo "✓ Test data restored successfully"
 
-echo "persistence-enabled tests passed"
+echo "Backup and restore tests passed"

@@ -19,10 +19,16 @@ test:
 	@CONTAINER=$$(docker compose ps -q openclaw-gateway | head -1); \
 	CONTAINER_NAME=$$(docker inspect --format '{{.Name}}' $$CONTAINER | sed 's/^.//'); \
 	echo "Running tests for config: $(CONFIG) (container: $$CONTAINER_NAME)"; \
-	if [ -x "tests/$(CONFIG)/test.sh" ]; then \
-		./tests/$(CONFIG)/test.sh $$CONTAINER_NAME; \
-	else \
-		echo "No test script found for $(CONFIG)"; \
+	found=false; \
+	for script in $$(ls tests/$(CONFIG)/*.sh 2>/dev/null | sort); do \
+		if [ -x "$$script" ]; then \
+			found=true; \
+			echo "Running $$script"; \
+			"$$script" $$CONTAINER_NAME || exit 1; \
+		fi; \
+	done; \
+	if [ "$$found" = "false" ]; then \
+		echo "No test scripts found for $(CONFIG)"; \
 	fi
 
 test-all:
@@ -35,10 +41,16 @@ test-all:
 		docker compose up -d --build >/dev/null 2>&1; \
 		CONTAINER=$$(docker compose ps -q openclaw-gateway | head -1); \
 		CONTAINER_NAME=$$(docker inspect --format '{{.Name}}' $$CONTAINER | sed 's/^.//'); \
-		if [ -x "tests/$$CONFIG/test.sh" ]; then \
-			./tests/$$CONFIG/test.sh $$CONTAINER_NAME || exit 1; \
-		else \
-			echo "No test script for $$CONFIG, skipping"; \
+		found=false; \
+		for script in $$(ls tests/$$CONFIG/*.sh 2>/dev/null | sort); do \
+			if [ -x "$$script" ]; then \
+				found=true; \
+				echo "Running $$script"; \
+				"$$script" $$CONTAINER_NAME || exit 1; \
+			fi; \
+		done; \
+		if [ "$$found" = "false" ]; then \
+			echo "No test scripts for $$CONFIG, skipping"; \
 		fi; \
 	done; \
 	echo ""; \

@@ -1,0 +1,21 @@
+#!/bin/bash
+# Test: SSH service running
+# Verifies SSH starts when enabled alongside UI
+
+set -e
+
+CONTAINER=${1:?Usage: $0 <container-name>}
+source "$(dirname "$0")/../lib.sh"
+
+echo "Testing SSH service (container: $CONTAINER)..."
+
+# Container should be running
+docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
+
+# SSH should be running
+wait_for_process "$CONTAINER" "sshd" || { echo "error: sshd not running but SSH_ENABLE=true"; exit 1; }
+
+# s6 service should be up
+assert_service_up "$CONTAINER" "sshd" || exit 1
+
+echo "SSH service tests passed"

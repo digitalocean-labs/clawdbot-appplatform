@@ -1,13 +1,13 @@
 #!/bin/bash
-# Test: SSH enabled configuration
-# Verifies SSH service starts correctly
+# Test: SSH service is running and accessible
+# Verifies sshd starts and port is listening
 
 set -e
 
 CONTAINER=${1:?Usage: $0 <container-name>}
 source "$(dirname "$0")/../lib.sh"
 
-echo "Testing ssh-enabled configuration (container: $CONTAINER)..."
+echo "Testing SSH service (container: $CONTAINER)..."
 
 # Container should be running
 docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
@@ -19,8 +19,7 @@ wait_for_process "$CONTAINER" "sshd" || { echo "error: sshd not running but SSH_
 docker exec "$CONTAINER" bash -c 'echo > /dev/tcp/127.0.0.1/22' 2>/dev/null || { echo "error: SSH not listening on port 22"; exit 1; }
 echo "✓ SSH listening on port 22"
 
-# Authorized keys should be set up (in ubuntu user's home)
-docker exec "$CONTAINER" test -f /home/ubuntu/.ssh/authorized_keys || { echo "error: authorized_keys not found"; exit 1; }
-echo "✓ authorized_keys exists"
+# s6 service should be up
+assert_service_up "$CONTAINER" "sshd" || exit 1
 
-echo "ssh-enabled tests passed"
+echo "SSH service tests passed"

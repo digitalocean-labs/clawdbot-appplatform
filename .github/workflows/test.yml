@@ -11,17 +11,26 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      configs: ${{ steps.list-configs.outputs.configs }}
+      test-matrix: ${{ steps.list-tests.outputs.matrix }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: List test configurations
-        id: list-configs
+      - name: List test scripts
+        id: list-tests
         run: |
-          configs=$(ls -1 example_configs/*.env | xargs -n1 basename | sed 's/\.env$//' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "configs=$configs" >> $GITHUB_OUTPUT
-          echo "Found configurations: $configs"
+          matrix='{"include":['
+          first=true
+          for env in example_configs/*.env; do
+            config=$(basename "$env" .env)
+            for script in $(ls tests/$config/*.sh 2>/dev/null | sort); do
+              [ "$first" = true ] && first=false || matrix+=','
+              matrix+="{\"config\":\"$config\",\"script\":\"$(basename $script)\"}"
+            done
+          done
+          matrix+=']}'
+          echo "matrix=$matrix" >> $GITHUB_OUTPUT
+          echo "Found test matrix: $matrix"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -50,8 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        config: ${{ fromJson(needs.build.outputs.configs) }}
+      matrix: ${{ fromJson(needs.build.outputs.test-matrix) }}
 
     steps:
       - name: Checkout repository
@@ -134,17 +142,13 @@ jobs:
             exit 1
           fi
 
-      - name: Run test script
+      - name: Run ${{ matrix.script }}
         env:
           DO_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
           DO_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
         run: |
-          if [ -x "tests/${{ matrix.config }}/test.sh" ]; then
-            echo "Running tests/${{ matrix.config }}/test.sh"
-            ./tests/${{ matrix.config }}/test.sh ${{ matrix.config }}
-          else
-            echo "No test script found for ${{ matrix.config }}, skipping"
-          fi
+          echo "Running tests/${{ matrix.config }}/${{ matrix.script }}"
+          ./tests/${{ matrix.config }}/${{ matrix.script }} ${{ matrix.config }}
 
       - name: Dump final container state
         if: always()
