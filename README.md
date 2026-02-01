@@ -223,8 +223,6 @@ After clicking **Generate key**, your auth key will be displayed. Copy it immedi
 
 The key format looks like: `tskey-auth-xxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxx`
 
-<!-- Screenshot: Auth key displayed -->
-
 ### 6. Add the Key to Your Deployment
 
 Set the `TS_AUTHKEY` environment variable in your `app.yaml` or in the DigitalOcean dashboard:
@@ -239,8 +237,6 @@ envs:
 ### 7. Verify the Connection
 
 After deploying, your OpenClaw instance will appear in the **Machines** tab of your Tailscale admin console.
-
-<!-- Screenshot: Machines list showing openclaw -->
 
 You can access your instance at:
 ```
