@@ -23,7 +23,7 @@ TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$TEST_DIR/../.." && pwd)"
 
 # Test configuration
-SPACES_REGION="${SPACES_REGION:-nyc3}"
+SPACES_REGION="${SPACES_REGION:-sfo3}"
 SPACES_ENDPOINT="${SPACES_REGION}.digitaloceanspaces.com"
 BUCKET_NAME="openclaw-test-$(date +%s)-$$"
 RESTIC_PASSWORD="test-password-$(date +%s)"
