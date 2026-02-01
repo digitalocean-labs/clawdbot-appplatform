@@ -13,7 +13,6 @@
 # 8. Cleans up the Spaces bucket
 #
 # Required environment variables (typically from CI secrets):
-# - DIGITALOCEAN_ACCESS_TOKEN: For doctl authentication
 # - DO_SPACES_ACCESS_KEY_ID: Spaces access key
 # - DO_SPACES_SECRET_ACCESS_KEY: Spaces secret key
 
@@ -24,12 +23,20 @@ TEST_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$TEST_DIR/../.." && pwd)"
 
 # Test configuration
-SPACES_REGION="${SPACES_REGION:-sfo3}"
+SPACES_REGION="${SPACES_REGION:-nyc3}"
 SPACES_ENDPOINT="${SPACES_REGION}.digitaloceanspaces.com"
 BUCKET_NAME="openclaw-test-$(date +%s)-$$"
 RESTIC_PASSWORD="test-password-$(date +%s)"
 TEST_FILE_CONTENT="persistence-test-$(date +%s)"
 TEST_FILE_PATH="/data/.openclaw/test-persistence.txt"
+
+# s3cmd configuration
+s3cmd_opts() {
+    echo "--access_key=$DO_SPACES_ACCESS_KEY_ID"
+    echo "--secret_key=$DO_SPACES_SECRET_ACCESS_KEY"
+    echo "--host=$SPACES_ENDPOINT"
+    echo "--host-bucket=%(bucket)s.$SPACES_ENDPOINT"
+}
 
 # Cleanup function
 cleanup() {
@@ -39,18 +46,11 @@ cleanup() {
     # Stop the container first
     docker compose -f "$PROJECT_ROOT/compose.yaml" down 2>/dev/null || true
 
-    # Remove the test bucket
-    if [ -n "$BUCKET_NAME" ] && [ "$BUCKET_CREATED" = "true" ] && command -v doctl &>/dev/null; then
+    # Remove the test bucket and its contents
+    if [ -n "$BUCKET_NAME" ] && [ "$BUCKET_CREATED" = "true" ]; then
         echo "Deleting Spaces bucket: $BUCKET_NAME"
-        # Use s3cmd if available to empty bucket first (required before deletion)
-        if command -v s3cmd &>/dev/null; then
-            s3cmd --access_key="$DO_SPACES_ACCESS_KEY_ID" \
-                  --secret_key="$DO_SPACES_SECRET_ACCESS_KEY" \
-                  --host="$SPACES_ENDPOINT" \
-                  --host-bucket="%(bucket)s.$SPACES_ENDPOINT" \
-                  del --recursive "s3://$BUCKET_NAME" 2>/dev/null || true
-        fi
-        if ! doctl spaces delete "$BUCKET_NAME" --region "$SPACES_REGION" --force 2>/dev/null; then
+        # Delete bucket and all contents
+        if ! s3cmd $(s3cmd_opts) rb --recursive "s3://$BUCKET_NAME" 2>/dev/null; then
             echo "warning: Could not delete bucket $BUCKET_NAME (may need manual cleanup)"
         fi
     fi
@@ -64,18 +64,12 @@ BUCKET_CREATED="false"
 check_prerequisites() {
     echo "Checking prerequisites..."
 
-    if ! command -v doctl &>/dev/null; then
-        echo "error: doctl not found. Install with: brew install doctl"
+    if ! command -v s3cmd &>/dev/null; then
+        echo "error: s3cmd not found. Install with: brew install s3cmd"
         exit 1
     fi
 
     # Check for required environment variables
-    if [ -z "$DIGITALOCEAN_ACCESS_TOKEN" ]; then
-        echo "SKIP: DIGITALOCEAN_ACCESS_TOKEN not set (required for Spaces bucket creation)"
-        echo "Set this secret in CI or export it locally to run persistence tests"
-        exit 0
-    fi
-
     if [ -z "$DO_SPACES_ACCESS_KEY_ID" ] || [ -z "$DO_SPACES_SECRET_ACCESS_KEY" ]; then
         echo "SKIP: DO_SPACES_ACCESS_KEY_ID or DO_SPACES_SECRET_ACCESS_KEY not set"
         echo "Set these secrets in CI or export them locally to run persistence tests"
@@ -89,7 +83,7 @@ check_prerequisites() {
 create_spaces_bucket() {
     echo "Creating temporary Spaces bucket: $BUCKET_NAME in $SPACES_REGION..."
 
-    if ! doctl spaces create "$BUCKET_NAME" --region "$SPACES_REGION"; then
+    if ! s3cmd $(s3cmd_opts) mb "s3://$BUCKET_NAME"; then
         echo "error: Failed to create Spaces bucket"
         exit 1
     fi
