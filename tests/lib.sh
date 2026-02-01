@@ -124,3 +124,31 @@ assert_process_running() {
     echo "✓ $process running"
     return 0
 }
+
+# Check that an s6 service is supervised (up)
+# Usage: assert_service_up <container-name> <service-name>
+assert_service_up() {
+    local container=$1
+    local service=$2
+
+    if ! docker exec "$container" /command/s6-svok "/run/service/$service" 2>/dev/null; then
+        echo "error: $service service not supervised but should be"
+        return 1
+    fi
+    echo "✓ $service service supervised"
+    return 0
+}
+
+# Check that an s6 service is NOT supervised (down or doesn't exist)
+# Usage: assert_service_down <container-name> <service-name>
+assert_service_down() {
+    local container=$1
+    local service=$2
+
+    if docker exec "$container" /command/s6-svok "/run/service/$service" 2>/dev/null; then
+        echo "error: $service service supervised but should not be"
+        return 1
+    fi
+    echo "✓ $service service not supervised (as expected)"
+    return 0
+}
