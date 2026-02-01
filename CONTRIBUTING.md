@@ -165,7 +165,6 @@ To run the persistence test in CI, add these secrets to your GitHub repository:
 
 | Secret | Description |
 |--------|-------------|
-| `DIGITALOCEAN_ACCESS_TOKEN` | DO API token with Spaces read/write access |
 | `DO_SPACES_ACCESS_KEY_ID` | Spaces access key ID |
 | `DO_SPACES_SECRET_ACCESS_KEY` | Spaces secret access key |
 
@@ -174,8 +173,10 @@ If secrets are not configured, the test will be skipped (not failed).
 **Running Locally:**
 
 ```bash
+# Install s3cmd if needed
+brew install s3cmd
+
 # Set required environment variables
-export DIGITALOCEAN_ACCESS_TOKEN="your-do-token"
 export DO_SPACES_ACCESS_KEY_ID="your-spaces-key"
 export DO_SPACES_SECRET_ACCESS_KEY="your-spaces-secret"
 
@@ -185,14 +186,7 @@ export DO_SPACES_SECRET_ACCESS_KEY="your-spaces-secret"
 
 **Creating DO Spaces Credentials:**
 
-```bash
-# Install doctl if needed
-brew install doctl
-
-# Authenticate
-doctl auth init
-
-# Create Spaces access keys
-doctl spaces keys create --name "openclaw-ci-test"
-# Note the Access Key and Secret Key from the output
-```
+Create Spaces access keys in the DigitalOcean control panel:
+1. Go to API → Spaces Keys
+2. Click "Generate New Key"
+3. Note the Access Key and Secret Key

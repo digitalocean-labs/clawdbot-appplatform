@@ -59,10 +59,8 @@ jobs:
       - name: Load Docker image
         run: docker load -i /tmp/openclaw-test.tar
 
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
-        with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      - name: Install s3cmd
+        run: sudo apt-get update && sudo apt-get install -y s3cmd
 
       - name: Copy test configuration
         run: |
@@ -106,7 +104,6 @@ jobs:
 
       - name: Run test script
         env:
-          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           DO_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
           DO_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
         run: |
