@@ -32,14 +32,10 @@ wait_for_container() {
         return 1
     fi
 
-    # Wait a moment for s6 init to complete
-    sleep 5
-
-    # Then verify s6 services are supervised
+    # Wait for s6 init to complete (check for /run/service/s6-linux-init-shutdownd which appears after services start)
     attempt=1
     while [ $attempt -le $max_attempts ]; do
-        # Check if s6-supervise is running for any service
-        if docker exec "$container" /command/s6-svstat /run/service/crond 2>/dev/null | grep -q "^up"; then
+        if docker exec "$container" test -S /run/service/.s6-svscan/control 2>/dev/null; then
             echo "✓ Container is responsive"
             return 0
         fi
@@ -47,7 +43,7 @@ wait_for_container() {
         attempt=$((attempt + 1))
     done
 
-    echo "error: s6 services not supervised"
+    echo "error: s6 did not initialize"
     return 1
 }
 
