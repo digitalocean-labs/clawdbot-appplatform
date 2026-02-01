@@ -49,7 +49,7 @@ wait_for_service() {
     echo "Waiting for $service service..."
 
     while [ $attempt -le $max_attempts ]; do
-        if docker exec "$container" /command/s6-svstat "/run/service/$service" 2>/dev/null | grep -q "^up"; then
+        if docker exec "$container" /command/s6-svok "/run/service/$service" 2>/dev/null; then
             echo "✓ $service service running"
             return 0
         fi
@@ -59,7 +59,7 @@ wait_for_service() {
     done
 
     echo "error: $service service did not start"
-    docker exec "$container" /command/s6-svstat "/run/service/$service" 2>&1 || true
+    docker exec "$container" /command/s6-svok "/run/service/$service" 2>&1 || true
     return 1
 }
 
