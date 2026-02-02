@@ -13,6 +13,8 @@ jobs:
     outputs:
       configs: ${{ steps.list-configs.outputs.configs }}
       scenarios: ${{ steps.list-scenarios.outputs.scenarios }}
+      registry_name: ${{ steps.create-registry.outputs.registry_name }}
+      image_tag: ${{ steps.push-image.outputs.image_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,27 +42,45 @@ jobs:
           echo "scenarios=$matrix" >> $GITHUB_OUTPUT
           echo "Found scenarios: $matrix"
 
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+
+      - name: Create DOCR registry
+        id: create-registry
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: |
+          REGISTRY_NAME="openclaw-ci-$(echo ${{ github.run_id }} | head -c 8)"
+          echo "Creating DOCR registry: $REGISTRY_NAME"
+          doctl registry create "$REGISTRY_NAME" --subscription-tier professional --region nyc3 || {
+            echo "Registry creation failed, trying to use existing..."
+          }
+          echo "registry_name=$REGISTRY_NAME" >> $GITHUB_OUTPUT
+
+      - name: Log in to DOCR
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: doctl registry login
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Build and push Docker image
+        id: push-image
         uses: docker/build-push-action@v6
         with:
           context: .
-          load: true
-          tags: openclaw-test:latest
+          push: true
+          tags: registry.digitalocean.com/${{ steps.create-registry.outputs.registry_name }}/openclaw-test:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Save Docker image
-        run: docker save openclaw-test:latest -o /tmp/openclaw-test.tar
-
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp/openclaw-test.tar
-          retention-days: 1
+      - name: Output image tag
+        id: image-tag
+        run: |
+          echo "image_tag=registry.digitalocean.com/${{ steps.create-registry.outputs.registry_name }}/openclaw-test:${{ github.sha }}" >> $GITHUB_OUTPUT
 
   setup:
     needs: build
@@ -85,20 +105,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp
-
-      - name: Load Docker image
-        run: docker load -i /tmp/openclaw-test.tar
-
       - name: Install doctl
-        if: contains(matrix.script, 'app-platform')
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+
+      - name: Log in to DOCR
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: doctl registry login
+
+      - name: Pull Docker image
+        run: |
+          docker pull ${{ needs.build.outputs.image_tag }}
+          docker tag ${{ needs.build.outputs.image_tag }} openclaw-test:latest
 
       - name: Install s3cmd
         if: matrix.config == 'persistence-enabled'
@@ -262,6 +282,8 @@ jobs:
           SKIP_TAILSCALE: ${{ steps.tailscale-check.outputs.SKIP_TAILSCALE }}
           TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_TOKEN }}
           DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          CI_REGISTRY_NAME: ${{ needs.build.outputs.registry_name }}
+          CI_IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
         run: |
           echo "Running tests/${{ matrix.config }}/${{ matrix.script }}"
           ./tests/${{ matrix.config }}/${{ matrix.script }} ${{ matrix.config }}
@@ -314,14 +336,24 @@ jobs:
           echo "Cleaning up App Platform app: ${{ steps.run-test.outputs.app_id }}"
           doctl apps delete "${{ steps.run-test.outputs.app_id }}" --force || echo "App already deleted or not found (404 is OK)"
 
-      - name: Cleanup DOCR registry
-        if: always() && steps.run-test.outputs.registry_name != ''
-        env:
-          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
-        run: |
-          echo "Cleaning up DOCR registry: ${{ steps.run-test.outputs.registry_name }}"
-          doctl registries delete "${{ steps.run-test.outputs.registry_name }}" --force || echo "Registry already deleted or not found (404 is OK)"
-
       - name: Cleanup
         if: always()
         run: docker compose down || true
+
+  cleanup:
+    needs: [build, scenario]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+
+      - name: Cleanup DOCR registry
+        if: needs.build.outputs.registry_name != ''
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: |
+          echo "Cleaning up DOCR registry: ${{ needs.build.outputs.registry_name }}"
+          doctl registries delete "${{ needs.build.outputs.registry_name }}" --force || echo "Registry already deleted or not found (404 is OK)"
