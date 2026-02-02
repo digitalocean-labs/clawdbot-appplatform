@@ -132,7 +132,7 @@ APP_SPEC=$(yq -o=json "$SPEC_FILE" | jq \
     ')
 
 echo "Creating app on App Platform..."
-CREATE_OUTPUT=$(echo "$APP_SPEC" | doctl apps create --spec - --format ID --no-header 2>&1) || {
+CREATE_OUTPUT=$(echo "$APP_SPEC" | doctl apps create --spec - --format ID --no-header --wait 2>&1) || {
     echo "error: Failed to create app"
     echo "$CREATE_OUTPUT"
     exit 1
@@ -158,8 +158,7 @@ DEPLOY_START=$(date +%s)
 
 while true; do
     ELAPSED=$(($(date +%s) - DEPLOY_START))
-    APP_STATUS=$(doctl apps get "$APP_ID" --format ActiveDeployment.Phase --no-header 2>/dev/null | tr -d '[:space:]')
-    [ -z "$APP_STATUS" ] && APP_STATUS="PENDING"
+    APP_STATUS=$(doctl apps get "$APP_ID" -o json 2>/dev/null | jq -r '.active_deployment.phase // "PENDING"')
     echo "  [$ELAPSED s] Status: $APP_STATUS"
 
     case "$APP_STATUS" in
@@ -167,7 +166,7 @@ while true; do
             echo "✓ App deployed successfully"
             break
             ;;
-        PENDING|PENDING_BUILD|BUILDING|PENDING_DEPLOY|DEPLOYING|UNKNOWN)
+        PENDING|PENDING_BUILD|BUILDING|PENDING_DEPLOY|DEPLOYING)
             # Still in progress, continue waiting
             ;;
         ERROR|CANCELED)
