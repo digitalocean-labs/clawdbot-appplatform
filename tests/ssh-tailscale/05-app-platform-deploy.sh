@@ -10,45 +10,6 @@ source "$(dirname "$0")/../lib.sh"
 
 SPEC_FILE="$(dirname "$0")/app-ssh-local.spec.yaml"
 APP_ID=""
-REGISTRY_NAME=""
-OWN_REGISTRY=false
-
-# Dump app state for debugging
-dump_app_state() {
-    if [ -z "$APP_ID" ]; then
-        echo "No APP_ID set, skipping dump"
-        return
-    fi
-    echo ""
-    echo "=== Dumping app state for debugging ==="
-    echo "App ID: $APP_ID"
-
-    # Get component name
-    local component=$(doctl apps get "$APP_ID" -o json 2>/dev/null | jq -r '.spec.workers[0].name // empty')
-    [ -z "$component" ] && component="$APP_NAME"
-
-    echo ""
-    echo "=== App JSON ==="
-    doctl apps get "$APP_ID" -o json 2>/dev/null | jq '.' || true
-
-    echo ""
-    echo "=== Build logs ==="
-    doctl apps logs "$APP_ID" --type=build 2>/dev/null | tail -100 || true
-
-    echo ""
-    echo "=== Run logs ==="
-    doctl apps logs "$APP_ID" --type=run 2>/dev/null | tail -100 || true
-
-    echo ""
-    echo "=== Process list (ps aux) ==="
-    echo "ps aux" | timeout 30 doctl apps console "$APP_ID" "$component" 2>/dev/null || echo "Failed to get process list"
-
-    echo ""
-    echo "=== End of dump ==="
-}
-
-# Trap to dump state on failure
-trap 'dump_app_state' ERR
 
 echo "Testing App Platform deployment..."
 
@@ -122,8 +83,8 @@ APP_SPEC=$(yq -o=json "$SPEC_FILE" | jq \
     ]
     ')
 
-echo "Creating app on App Platform..."
-CREATE_OUTPUT=$(doctl apps create --spec - -o json << EOF
+echo "Creating app on App Platform (waiting for deployment)..."
+CREATE_OUTPUT=$(doctl apps create --spec - --wait -o json <<EOF
 $APP_SPEC
 EOF
 ) || {
@@ -132,61 +93,27 @@ EOF
     exit 1
 }
 
-APP_ID=$(echo "$CREATE_OUTPUT" | jq -r '.id // empty')
+APP_ID=$(echo "$CREATE_OUTPUT" | jq -r '.[0].id // empty')
 if [ -z "$APP_ID" ]; then
     echo "error: Failed to get app ID from creation output"
     echo "$CREATE_OUTPUT"
     exit 1
 fi
-echo "✓ Created app: $APP_ID"
+echo "✓ App deployed: $APP_ID"
 
 # Output app ID for cleanup step
 if [ -n "$GITHUB_OUTPUT" ]; then
     echo "app_id=$APP_ID" >> "$GITHUB_OUTPUT"
 fi
 
-# Wait for app to be fully deployed (ACTIVE status)
-echo "Waiting for app deployment (this may take several minutes)..."
-DEPLOY_TIMEOUT=1200  # 20 minutes
-DEPLOY_START=$(date +%s)
-
-while true; do
-    ELAPSED=$(($(date +%s) - DEPLOY_START))
-    APP_JSON=$(doctl apps get "$APP_ID" -o json 2>/dev/null)
-    echo "DEBUG JSON: $APP_JSON" | head -c 500
-    APP_STATUS=$(echo "$APP_JSON" | jq -r '.active_deployment.phase // "PENDING"')
-    echo "  [$ELAPSED s] Status: $APP_STATUS"
-
-    case "$APP_STATUS" in
-        ACTIVE)
-            echo "✓ App deployed successfully"
-            break
-            ;;
-        PENDING|PENDING_BUILD|BUILDING|PENDING_DEPLOY|DEPLOYING)
-            # Still in progress, continue waiting
-            ;;
-        ERROR|CANCELED)
-            echo "error: App deployment failed with status: $APP_STATUS"
-            doctl apps logs "$APP_ID" --type=build 2>/dev/null | tail -50 || true
-            exit 1
-            ;;
-    esac
-
-    if [ $ELAPSED -ge $DEPLOY_TIMEOUT ]; then
-        echo "error: Deployment timed out after ${DEPLOY_TIMEOUT}s"
-        doctl apps logs "$APP_ID" --type=build 2>/dev/null | tail -50 || true
-        exit 1
-    fi
-    sleep 10
-done
-
-# Get app info
+# Get app info and component name
+APP_JSON=$(doctl apps get "$APP_ID" -o json 2>/dev/null)
 echo ""
 echo "App details:"
-doctl apps get "$APP_ID" --format ID,DefaultIngress,ActiveDeployment.Phase 2>/dev/null || true
+echo "$APP_JSON" | jq -r '.[0] | "ID: \(.id)\nIngress: \(.default_ingress // "none")\nPhase: \(.active_deployment.phase // "unknown")"' || true
 
-# Get component name for console access
-COMPONENT_NAME=$(doctl apps get "$APP_ID" --format Spec.Workers[0].Name --no-header 2>/dev/null || echo "$APP_NAME")
+COMPONENT_NAME=$(echo "$APP_JSON" | jq -r '.[0].spec.workers[0].name // empty')
+[ -z "$COMPONENT_NAME" ] && COMPONENT_NAME="$APP_NAME"
 echo "Component: $COMPONENT_NAME"
 
 # Test app via console - verify SSH is working
@@ -210,12 +137,11 @@ if [ "$SSHD_CHECK" != "SSHD_RUNNING" ]; then
 fi
 echo "✓ sshd is running"
 
-# Test SSH to different users
-for target_user in ubuntu openclaw root; do
+# Test SSH to users that should work (ubuntu, root)
+for target_user in ubuntu root; do
     echo "Testing SSH from $CURRENT_USER to $target_user@localhost..."
     SSH_OUTPUT=$(echo "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes $target_user@localhost 'whoami && motd' 2>/dev/null || echo SSH_FAILED" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r') || SSH_OUTPUT="SSH_FAILED"
 
-    # First line should be the username
     SSH_USER=$(echo "$SSH_OUTPUT" | head -1)
     if [ "$SSH_USER" = "$target_user" ]; then
         echo "✓ SSH to $target_user@localhost works"
@@ -227,8 +153,16 @@ for target_user in ubuntu openclaw root; do
     fi
 done
 
-# Dump app state before cleanup
-dump_app_state
+# Test SSH to openclaw should fail (no local SSH access for service account)
+echo "Testing SSH to openclaw@localhost should be denied..."
+SSH_OUTPUT=$(echo "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes openclaw@localhost 'whoami' 2>&1 || echo SSH_DENIED" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r') || SSH_OUTPUT="SSH_DENIED"
+
+if echo "$SSH_OUTPUT" | grep -q "SSH_DENIED\|Permission denied\|not allowed"; then
+    echo "✓ SSH to openclaw@localhost correctly denied"
+else
+    echo "error: SSH to openclaw@localhost should have been denied but got: $SSH_OUTPUT"
+    exit 1
+fi
 
 echo ""
 echo "App Platform deployment test passed (app will be cleaned up)"

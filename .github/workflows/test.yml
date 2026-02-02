@@ -342,6 +342,36 @@ jobs:
           docker stop tailscale-test 2>/dev/null || true
           docker rm tailscale-test 2>/dev/null || true
 
+      - name: Dump App Platform state
+        if: always() && steps.run-test.outputs.app_id != ''
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: |
+          APP_ID="${{ steps.run-test.outputs.app_id }}"
+          echo "=== Dumping app state for debugging ==="
+          echo "App ID: $APP_ID"
+
+          APP_JSON=$(doctl apps get "$APP_ID" -o json 2>/dev/null) || true
+          COMPONENT=$(echo "$APP_JSON" | jq -r '.[0].spec.workers[0].name // empty')
+
+          echo ""
+          echo "=== App JSON ==="
+          echo "$APP_JSON" | jq '.' || true
+
+          echo ""
+          echo "=== Build logs ==="
+          doctl apps logs "$APP_ID" --type=build 2>/dev/null | tail -100 || true
+
+          echo ""
+          echo "=== Run logs ==="
+          doctl apps logs "$APP_ID" --type=run 2>/dev/null | tail -100 || true
+
+          echo ""
+          echo "=== Process list ==="
+          if [ -n "$COMPONENT" ]; then
+            echo "ps aux" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT" 2>/dev/null || echo "Failed to get process list"
+          fi
+
       - name: Cleanup App Platform app
         if: always() && steps.run-test.outputs.app_id != ''
         env:
