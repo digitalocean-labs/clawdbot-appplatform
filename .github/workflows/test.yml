@@ -63,7 +63,7 @@ jobs:
           # Create registry or verify existing
           RESULT=$(doctl registry create "$REGISTRY_NAME" --subscription-tier professional --region nyc3 -o json 2>&1) || {
             # Check if registry exists via get
-            EXISTING=$(doctl registries get "$REGISTRY_NAME" -o json 2>/dev/null | jq -r '.name // empty')
+            EXISTING=$(doctl registries get "$REGISTRY_NAME" -o json 2>/dev/null | jq -r '.[0].name // empty')
             if [ "$EXISTING" = "$REGISTRY_NAME" ]; then
               echo "Using existing registry: $REGISTRY_NAME"
             else
