@@ -79,54 +79,8 @@ APP_NAME="openclaw-ci-$(date +%s)-$$"
 echo "App name: $APP_NAME"
 
 # Use CI registry if available, otherwise create our own
-if [ -n "$CI_REGISTRY_NAME" ] && [ -n "$CI_IMAGE_TAG" ]; then
-    echo "Using CI registry: $CI_REGISTRY_NAME"
-    REGISTRY_NAME="$CI_REGISTRY_NAME"
-    IMAGE_TAG="$CI_IMAGE_TAG"
-else
-    echo "No CI registry, creating own..."
-    OWN_REGISTRY=true
-    REGISTRY_NAME="octest$(date +%s)"
-    echo "Registry name: $REGISTRY_NAME"
-
-    # Create DOCR registry with professional plan
-    echo ""
-    echo "Creating DOCR registry..."
-    doctl registry create "$REGISTRY_NAME" --subscription-tier professional --region nyc3 || {
-        echo "error: Failed to create registry"
-        exit 1
-    }
-    echo "✓ Created registry: $REGISTRY_NAME"
-
-    # Output registry name for cleanup step
-    if [ -n "$GITHUB_OUTPUT" ]; then
-        echo "registry_name=$REGISTRY_NAME" >> "$GITHUB_OUTPUT"
-    fi
-
-    # Login to registry
-    echo "Logging into registry..."
-    doctl registry login || {
-        echo "error: Failed to login to registry"
-        exit 1
-    }
-    echo "✓ Logged into registry"
-
-    # Tag and push local image to DOCR
-    REGISTRY_HOST="registry.digitalocean.com"
-    IMAGE_TAG="$REGISTRY_HOST/$REGISTRY_NAME/openclaw:latest"
-    echo "Tagging image as $IMAGE_TAG..."
-    docker tag openclaw-test:latest "$IMAGE_TAG" || {
-        echo "error: Failed to tag image"
-        exit 1
-    }
-
-    echo "Pushing image to DOCR..."
-    docker push "$IMAGE_TAG" || {
-        echo "error: Failed to push image"
-        exit 1
-    }
-    echo "✓ Pushed image to DOCR"
-fi
+echo "Using CI registry: $CI_REGISTRY_NAME"
+IMAGE_TAG="$CI_IMAGE_TAG"
 
 # Parse image tag to get registry, repository, and tag
 # Format: registry.digitalocean.com/REGISTRY/REPO:TAG
@@ -169,13 +123,13 @@ APP_SPEC=$(yq -o=json "$SPEC_FILE" | jq \
     ')
 
 echo "Creating app on App Platform..."
-CREATE_OUTPUT=$(echo "$APP_SPEC" | doctl apps create --spec - --format ID --no-header --wait 2>&1) || {
+CREATE_OUTPUT=$(echo "$APP_SPEC" | doctl apps create --spec - -o json --wait 2>&1) || {
     echo "error: Failed to create app"
     echo "$CREATE_OUTPUT"
     exit 1
 }
 
-APP_ID=$(echo "$CREATE_OUTPUT" | head -1)
+APP_ID=$(echo "$CREATE_OUTPUT" | jq -r '.id // empty')
 if [ -z "$APP_ID" ]; then
     echo "error: Failed to get app ID from creation output"
     echo "$CREATE_OUTPUT"
