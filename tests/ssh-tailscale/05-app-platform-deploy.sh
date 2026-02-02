@@ -13,6 +13,43 @@ APP_ID=""
 REGISTRY_NAME=""
 OWN_REGISTRY=false
 
+# Dump app state for debugging
+dump_app_state() {
+    if [ -z "$APP_ID" ]; then
+        echo "No APP_ID set, skipping dump"
+        return
+    fi
+    echo ""
+    echo "=== Dumping app state for debugging ==="
+    echo "App ID: $APP_ID"
+
+    # Get component name
+    local component=$(doctl apps get "$APP_ID" -o json 2>/dev/null | jq -r '.spec.workers[0].name // empty')
+    [ -z "$component" ] && component="$APP_NAME"
+
+    echo ""
+    echo "=== App JSON ==="
+    doctl apps get "$APP_ID" -o json 2>/dev/null | jq '.' || true
+
+    echo ""
+    echo "=== Build logs ==="
+    doctl apps logs "$APP_ID" --type=build 2>/dev/null | tail -100 || true
+
+    echo ""
+    echo "=== Run logs ==="
+    doctl apps logs "$APP_ID" --type=run 2>/dev/null | tail -100 || true
+
+    echo ""
+    echo "=== Process list (ps aux) ==="
+    echo "ps aux" | timeout 30 doctl apps console "$APP_ID" "$component" 2>/dev/null || echo "Failed to get process list"
+
+    echo ""
+    echo "=== End of dump ==="
+}
+
+# Trap to dump state on failure
+trap 'dump_app_state' ERR
+
 echo "Testing App Platform deployment..."
 
 # Use DIGITALOCEAN_TOKEN env var if set (passed from workflow)
@@ -233,10 +270,8 @@ for target_user in ubuntu openclaw root; do
     fi
 done
 
-# Check logs for successful startup
-echo ""
-echo "Checking app logs..."
-doctl apps logs "$APP_ID" --type=run 2>/dev/null | grep -E "(sshd|SSH|Started)" | tail -10 || true
+# Dump app state before cleanup
+dump_app_state
 
 echo ""
 echo "App Platform deployment test passed (app will be cleaned up)"
