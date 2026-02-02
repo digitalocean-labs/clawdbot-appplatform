@@ -14,9 +14,14 @@ REGISTRY_NAME=""
 
 echo "Testing App Platform deployment..."
 
-# Verify doctl is authenticated (doctl action configures this)
+# Use DIGITALOCEAN_TOKEN env var if set (passed from workflow)
+if [ -n "$DIGITALOCEAN_TOKEN" ]; then
+    export DIGITALOCEAN_ACCESS_TOKEN="$DIGITALOCEAN_TOKEN"
+fi
+
+# Verify doctl is authenticated
 if ! doctl account get &>/dev/null; then
-    echo "error: doctl not authenticated (run Install doctl action first)"
+    echo "error: doctl not authenticated (set DIGITALOCEAN_TOKEN or run Install doctl action)"
     exit 1
 fi
 echo "✓ doctl authenticated"
