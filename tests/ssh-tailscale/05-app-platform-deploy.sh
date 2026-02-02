@@ -147,12 +147,16 @@ echo "✓ sshd is running"
 # Test SSH to different users
 for target_user in ubuntu openclaw root; do
     echo "Testing SSH from $CURRENT_USER to $target_user@localhost..."
-    SSH_RESULT=$(echo "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes $target_user@localhost whoami 2>/dev/null || echo SSH_FAILED" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r' | tail -1) || SSH_RESULT="SSH_FAILED"
+    SSH_OUTPUT=$(echo "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes $target_user@localhost 'whoami && motd' 2>/dev/null || echo SSH_FAILED" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT_NAME" 2>/dev/null | tr -d '\r') || SSH_OUTPUT="SSH_FAILED"
 
-    if [ "$SSH_RESULT" = "$target_user" ]; then
+    # First line should be the username
+    SSH_USER=$(echo "$SSH_OUTPUT" | head -1)
+    if [ "$SSH_USER" = "$target_user" ]; then
         echo "✓ SSH to $target_user@localhost works"
+        echo "$SSH_OUTPUT" | tail -n +2 | head -20
     else
-        echo "error: SSH to $target_user@localhost failed (got: $SSH_RESULT)"
+        echo "error: SSH to $target_user@localhost failed (got: $SSH_USER)"
+        echo "$SSH_OUTPUT"
         exit 1
     fi
 done
