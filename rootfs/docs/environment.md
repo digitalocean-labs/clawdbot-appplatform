@@ -30,14 +30,17 @@ Variables are stored both at the root (for `with-contenv`) and in prefix subdire
 
 The shared library at `/etc/s6-overlay/lib/env-utils.sh` provides functions for managing environment variables.
 
-| Function             | Description                                                                 | Example                                      |
-| -------------------- | --------------------------------------------------------------------------- | -------------------------------------------- |
-| `persist_env_prefix` | Write all env vars matching prefixes to container environment               | `persist_env_prefix FOO_ BAR_`               |
-| `persist_env_var`    | Write specific vars to a prefix dir, with optional defaults if unset        | `persist_env_var FOO_ VAR1 VAR2=default`     |
-| `persist_env_global` | Write vars to all existing prefix dirs, with optional defaults              | `persist_env_global VAR1 VAR2=default`       |
-| `source_env_prefix`  | Export vars from prefix directories into current shell                      | `source_env_prefix FOO_`                     |
-| `with_env_prefix`    | Load prefix dirs then exec a command                                        | `with_env_prefix FOO_ -- mycommand`          |
-| `apply_permissions`  | Apply file permissions from YAML config                                     | `apply_permissions`                          |
+| Function             | Description                                                          | Example                                  |
+| -------------------- | -------------------------------------------------------------------- | ---------------------------------------- |
+| `persist_env_prefix` | Write all env vars matching prefixes to container environment        | `persist_env_prefix FOO_ BAR_`           |
+| `persist_env_var`    | Write specific vars to a prefix dir, with optional defaults if unset | `persist_env_var FOO_ VAR1 VAR2=default` |
+| `persist_env_global` | Write vars to all existing prefix dirs, with optional defaults       | `persist_env_global VAR1 VAR2=default`   |
+| `broadcast_prefix`   | Copy all vars from one prefix to all other prefix directories        | `broadcast_prefix PUBLIC_`               |
+| `source_env_prefix`  | Export vars from prefix directories into current shell               | `source_env_prefix FOO_`                 |
+| `with_env_prefix`    | Load prefix dirs then exec a command                                 | `with_env_prefix FOO_ -- mycommand`      |
+| `apply_permissions`  | Apply file permissions from YAML config                              | `apply_permissions`                      |
+
+For service management, see [system-architecture.md](system-architecture.md).
 
 ## s6 Commands Reference
 
@@ -50,7 +53,41 @@ The shared library at `/etc/s6-overlay/lib/env-utils.sh` provides functions for 
 
 ## File Permissions
 
-Environment files are created with mode `0600` (root read/write only) by default. See [permissions.md](permissions.md) for customization.
+Environment files are created with mode `0600` (root read/write only) by default.
+
+### Prefix Permissions
+
+Different prefixes have different access levels:
+
+| Prefix      | Mode   | Access         | Use Case                               |
+| ----------- | ------ | -------------- | -------------------------------------- |
+| `PUBLIC_`   | `0644` | World-readable | Settings any user/script needs to read |
+| `OPENCLAW_` | `0640` | openclaw only  | OpenClaw service configuration         |
+| `SSH_`      | `0640` | root only      | SSH configuration                      |
+| `TS_`       | `0640` | root only      | Tailscale auth keys (sensitive)        |
+| (default)   | `0600` | root only      | All other environment variables        |
+
+### Using PUBLIC_ Variables
+
+Variables prefixed with `PUBLIC_` are:
+1. **World-readable** - Any user can access them
+2. **Broadcast to all prefixes** - Copied into every other prefix directory
+
+This means `PUBLIC_` vars are available when sourcing any prefix:
+
+```bash
+# In your .env or environment
+PUBLIC_FEATURE_FLAG=enabled
+
+# Available when sourcing any prefix
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix OPENCLAW_
+echo $PUBLIC_FEATURE_FLAG  # Works! PUBLIC_ vars are broadcast
+```
+
+Use `PUBLIC_` for non-sensitive settings that multiple services or scripts need.
+
+See [permissions.md](permissions.md) for full configuration.
 
 ## Related Files
 

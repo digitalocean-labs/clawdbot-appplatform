@@ -1,43 +1,79 @@
 permissions:
-  # Read-only documentation
+  # =============================================================================
+  # Read-only system directories
+  # =============================================================================
   - path: /docs
+    user: root
+    group: root
     mode: "0555"
   - path: /docs/*
+    user: root
+    group: root
     mode: "0444"
 
-  # Read-only shared libraries
   - path: /etc/s6-overlay/lib
+    user: root
+    group: root
     mode: "0555"
   - path: /etc/s6-overlay/lib/*
+    user: root
+    group: root
     mode: "0444"
 
-  # Read-only digitalocean config files
   - path: /etc/digitalocean
+    user: root
+    group: root
     mode: "0555"
   - path: /etc/digitalocean/*
+    user: root
+    group: root
     mode: "0444"
 
-  # s6 container environment - base directory must be traversable
+  # =============================================================================
+  # s6 container environment
+  # =============================================================================
   - path: /run/s6/container_environment
+    user: root
+    group: root
     mode: "0755"
 
-  # s6 container environment files - root only for sensitive data
+  # Default: root only
   - path: /run/s6/container_environment/**/*
     user: root
     group: root
     mode: "0600"
 
-  # OPENCLAW_ env directory and files readable by openclaw service
+  # PUBLIC_: world-readable, broadcast to all prefixes
+  - path: /run/s6/container_environment/PUBLIC_
+    user: root
+    group: root
+    mode: "0755"
+  - path: /run/s6/container_environment/PUBLIC_/*
+    user: root
+    group: root
+    mode: "0644"
+
+  # OPENCLAW_: openclaw only
   - path: /run/s6/container_environment/OPENCLAW_
     user: openclaw
     group: openclaw
-    mode: "0755"
+    mode: "0750"
   - path: /run/s6/container_environment/OPENCLAW_/*
     user: openclaw
     group: openclaw
-    mode: "0644"
+    mode: "0640"
 
-  # TS_ env directory and files readable by root only
+  # SSH_: root only
+  - path: /run/s6/container_environment/SSH_
+    user: root
+    group: root
+    mode: "0750"
+  - path: /run/s6/container_environment/SSH_/*
+    user: root
+    group: root
+    mode: "0640"
+
+  # TS_: root only (sensitive)
   - path: /run/s6/container_environment/TS_
     user: root
     group: root
@@ -97,8 +133,32 @@ permissions:
     user: root
     group: root
     mode: "0755"
+  - path: /etc/services.d
+    user: root
+    group: root
+    mode: "0755"
 
-  # SSH directories
+  # =============================================================================
+  # Cron
+  # =============================================================================
+  - path: /etc/cron.d
+    user: root
+    group: root
+    mode: "0755"
+  - path: /etc/cron.d/*
+    user: root
+    group: root
+    mode: "0644"
+
+  # =============================================================================
+  # SSH
+  # =============================================================================
+  # sshd requires /etc to have strict ownership for authorized_keys to work
+  - path: /etc
+    user: root
+    group: root
+    mode: "0755"
+
   - path: /etc/ssh
     user: root
     group: root
@@ -107,8 +167,36 @@ permissions:
     user: root
     group: root
     mode: "0755"
+  - path: /etc/ssh/sshd_config.d/*
+    user: root
+    group: root
+    mode: "0644"
+  - path: /etc/ssh/ssh_config.d
+    user: root
+    group: root
+    mode: "0755"
+  - path: /etc/ssh/ssh_config.d/*
+    user: root
+    group: root
+    mode: "0644"
 
+  # All .ssh directories and keys (ownership inherited from parent)
+  - path: /**/.ssh
+    mode: "0700"
+  - path: /**/.ssh/authorized_keys
+    mode: "0600"
+  - path: /**/.ssh/id_*
+    mode: "0600"
+  - path: /**/.ssh/*.pem
+    mode: "0600"
+  - path: /**/.ssh/*.key
+    mode: "0600"
+  - path: /**/.ssh/*.pub
+    mode: "0644"
+
+  # =============================================================================
   # Sudoers
+  # =============================================================================
   - path: /etc/sudoers.d
     user: root
     group: root
@@ -118,7 +206,21 @@ permissions:
     group: root
     mode: "0440"
 
-  # Dynamic MOTD scripts
+  # =============================================================================
+  # Profile scripts
+  # =============================================================================
+  - path: /etc/profile.d
+    user: root
+    group: root
+    mode: "0755"
+  - path: /etc/profile.d/*
+    user: root
+    group: root
+    mode: "0644"
+
+  # =============================================================================
+  # MOTD
+  # =============================================================================
   - path: /etc/update-motd.d
     user: root
     group: root
@@ -132,12 +234,25 @@ permissions:
     group: root
     mode: "0755"
 
-  # User SSH directories
-  - path: /home/ubuntu/.ssh
-    user: ubuntu
-    group: ubuntu
+  # =============================================================================
+  # Application data
+  # =============================================================================
+  - path: /data/.openclaw
+    user: openclaw
+    group: openclaw
     mode: "0700"
-  - path: /home/ubuntu/.ssh/authorized_keys
-    user: ubuntu
-    group: ubuntu
+  - path: /data/.openclaw/**
+    user: openclaw
+    group: openclaw
+  - path: /data/.openclaw/openclaw.json
+    user: openclaw
+    group: openclaw
     mode: "0600"
+
+  # =============================================================================
+  # Scripts
+  # =============================================================================
+  - path: /usr/local/bin/ssh-rotate-local-key
+    user: root
+    group: root
+    mode: "0755"

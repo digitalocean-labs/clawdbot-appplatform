@@ -1,0 +1,136 @@
+#!/command/with-contenv bash
+# Setup SSH configuration and local SSH access
+#
+# Base sshd config is written when SSH_ENABLE=true
+# Local access (localaccess group) is setup when SSH_ALLOW_LOCAL=true (default)
+#
+# When SSH_ENABLE=true and SSH_ALLOW_LOCAL=true:
+#   - Writes base sshd config (00-localssh.conf)
+#   - Creates 'localaccess' group with ubuntu and root as members
+#   - Generates fresh SSH keypairs for all group members (rotated on boot, daily via cron)
+#   - Writes all public keys to each user's ~/.ssh/authorized_keys
+#   - Allows root login from localhost only (Match block)
+#
+# When SSH_ENABLE=true and SSH_ALLOW_LOCAL=false:
+#   - Writes base sshd config only
+#   - Cleans up local access keys and configs
+#
+# When SSH_ENABLE=false:
+#   - Removes all SSH configs
+
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix SSH_
+
+GROUP="localaccess"
+
+# Write base sshd config
+write_base_config() {
+  mkdir -p /etc/ssh/sshd_config.d
+  cat > /etc/ssh/sshd_config.d/00-localssh.conf << 'EOF'
+# OpenClaw SSH configuration
+
+# Disable root login via SSH (can be overridden by Match blocks)
+PermitRootLogin no
+
+# Disable password authentication - key only
+PasswordAuthentication no
+PermitEmptyPasswords no
+ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
+
+# Enable public key authentication
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+
+# Use PAM for authentication
+UsePAM yes
+
+# Accept MOTD_SKIP to prevent MOTD recursion from openclaw wrapper
+AcceptEnv MOTD_SKIP
+EOF
+}
+
+# Cleanup local access (but keep base config)
+cleanup_local_access() {
+  persist_env_var _PUBLIC PUBLIC_SSH_LOCALACCESS=false
+
+  rm -f /etc/ssh/sshd_config.d/local-access.conf
+  rm -f /etc/ssh/ssh_config.d/00-localssh.conf
+
+  # Remove local access keys from user authorized_keys files
+  for user in ubuntu root openclaw; do
+    HOME_DIR=$(getent passwd "$user" | cut -d: -f6)
+    if [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/.ssh/authorized_keys" ]; then
+      sed -i '/^# BEGIN LOCAL ACCESS KEYS$/,/^# END LOCAL ACCESS KEYS$/d' "$HOME_DIR/.ssh/authorized_keys"
+    fi
+  done
+}
+
+# Full cleanup (remove all SSH configs)
+cleanup_all() {
+  cleanup_local_access
+  rm -f /etc/ssh/sshd_config.d/00-localssh.conf
+  echo "[ssh-local] Full cleanup complete"
+}
+
+# Check if SSH is enabled
+if [ "${SSH_ENABLE:-false}" != "true" ]; then
+  echo "[ssh-local] SSH disabled, cleaning up..."
+  cleanup_all
+  exit 0
+fi
+
+# SSH is enabled - always write base config
+echo "[ssh-local] Writing base sshd config..."
+write_base_config
+
+# Check if local SSH access is enabled
+if [ "${SSH_ALLOW_LOCAL:-true}" != "true" ]; then
+  echo "[ssh-local] Local SSH access disabled, cleaning up local access..."
+  cleanup_local_access
+  exit 0
+fi
+
+# Setup local SSH access
+echo "[ssh-local] Setting up local SSH access..."
+persist_env_var _PUBLIC PUBLIC_SSH_LOCALACCESS=true
+
+# Create localaccess group if it doesn't exist
+if ! getent group "$GROUP" >/dev/null; then
+  groupadd "$GROUP"
+  echo "[ssh-local] Created group: $GROUP"
+fi
+
+# Add ubuntu, root, and openclaw to the group
+for user in ubuntu root openclaw; do
+  if id "$user" &>/dev/null; then
+    usermod -aG "$GROUP" "$user"
+    echo "[ssh-local] Added $user to $GROUP group"
+  fi
+done
+
+# Create .ssh directories
+mkdir -p /root/.ssh
+mkdir -p /home/ubuntu/.ssh
+mkdir -p /home/openclaw/.ssh
+
+# Generate keys for all group members and populate authorized_keys
+/usr/local/bin/ssh-rotate-local-key
+
+# Allow root login from localhost only
+cat > /etc/ssh/sshd_config.d/local-access.conf << 'EOF'
+# Allow root login only from localhost (SSH_ALLOW_LOCAL feature)
+Match Address 127.0.0.1,::1
+    PermitRootLogin yes
+EOF
+
+# Configure ssh client to send MOTD_SKIP for localhost connections
+mkdir -p /etc/ssh/ssh_config.d
+cat > /etc/ssh/ssh_config.d/00-localssh.conf << 'EOF'
+# Send MOTD_SKIP to prevent MOTD recursion when using local SSH
+Host localhost
+  SendEnv MOTD_SKIP
+EOF
+
+echo "[ssh-local] Configured sshd for local access"
+echo "[ssh-local] Members of '$GROUP' group can SSH to any user on localhost"

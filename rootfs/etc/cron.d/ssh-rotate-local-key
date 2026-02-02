@@ -1,0 +1,2 @@
+# Rotate local SSH keys daily (SSH_ALLOW_LOCAL feature)
+0 0 * * * root /usr/local/bin/ssh-rotate-local-key

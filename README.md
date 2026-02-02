@@ -305,13 +305,15 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 
 ### Feature Flags
 
-| Variable           | Default | Description                  |
-| ------------------ | ------- | ---------------------------- |
-| `ENABLE_NGROK`     | `false` | Enable ngrok tunnel          |
-| `ENABLE_TAILSCALE` | `false` | Enable Tailscale             |
-| `ENABLE_SPACES`    | `false` | Enable DO Spaces persistence |
-| `ENABLE_UI`        | `true`  | Enable web Control UI        |
-| `SSH_ENABLE`       | `false` | Enable SSH server            |
+| Variable                 | Default | Description                                                     |
+| ------------------------ | ------- | --------------------------------------------------------------- |
+| `ENABLE_NGROK`           | `false` | Enable ngrok tunnel                                             |
+| `ENABLE_TAILSCALE`       | `false` | Enable Tailscale                                                |
+| `ENABLE_SPACES`          | `false` | Enable DO Spaces persistence                                    |
+| `ENABLE_UI`              | `true`  | Enable web Control UI                                           |
+| `SSH_ENABLE`             | `false` | Enable SSH server                                               |
+| `SSH_ALLOW_LOCAL`        | `true`  | Allow SSH to root/openclaw from localhost (requires SSH_ENABLE) |
+| `PUBLIC_SSH_LOCALACCESS` | `true`  | Make openclaw wrapper use local SSH instead of sudo/su          |
 
 ### ngrok (when ENABLE_NGROK=true)
 
@@ -343,6 +345,20 @@ See **[CHEATSHEET.md](CHEATSHEET.md)** for the complete reference.
 | `GRADIENT_API_KEY`       | DigitalOcean Gradient AI key                   |
 | `GITHUB_USERNAME`        | For SSH key fetching                           |
 
+### SSH Local Access (when SSH_ALLOW_LOCAL=true)
+
+When running in unprivileged containers (e.g., App Platform), you can attach to the console as the `ubuntu` user, then SSH locally to access other users:
+
+```bash
+ssh root@localhost      # Access root
+ssh openclaw@localhost  # Access openclaw user
+```
+
+**How it works:**
+- Fresh SSH keypairs are generated for `ubuntu` and `root` on each boot (rotated daily via cron)
+- All public keys are written to each user's `~/.ssh/authorized_keys`
+- Root login is allowed only from localhost
+
 ---
 
 ## Customization (s6-overlay)
@@ -353,12 +369,12 @@ The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) f
 
 On login, you'll see a colorful status display. Run `motd` anytime to refresh.
 
-| Section | Info |
-|---------|------|
-| 🖥️ System | Hostname, uptime, load, memory, disk (color-coded) |
-| 🔗 Tailscale | Status, IP, relay, serve URL (if enabled) |
-| 🦞 OpenClaw | Health status, configured channels, agent count |
-| 📚 Links | OpenClaw docs, App Platform docs, source repo |
+| Section     | Info                                               |
+| ----------- | -------------------------------------------------- |
+| 🖥️ System    | Hostname, uptime, load, memory, disk (color-coded) |
+| 🔗 Tailscale | Status, IP, relay, serve URL (if enabled)          |
+| 🦞 OpenClaw  | Health status, configured channels, agent count    |
+| 📚 Links     | OpenClaw docs, App Platform docs, source repo      |
 
 ### Add Custom Init Scripts
 
@@ -382,7 +398,7 @@ exec my-daemon --foreground
 
 | Service     | Description                                              |
 | ----------- | -------------------------------------------------------- |
-| `openclaw`  | OpenClaw gateway                                         |
+| `openclaw`  | OpenClaw                                                 |
 | `ngrok`     | ngrok tunnel (if enabled)                                |
 | `tailscale` | Tailscale daemon (if enabled)                            |
 | `backup`    | Restic backup service - creates snapshots (if enabled)   |
@@ -392,20 +408,6 @@ exec my-daemon --foreground
 
 ---
 
-## Available Regions
-
-| Code  | Location          |
-| ----- | ----------------- |
-| `nyc` | New York          |
-| `atl` | Atlanta           |
-| `ams` | Amsterdam         |
-| `sfo` | San Francisco     |
-| `sgp` | Singapore         |
-| `lon` | London            |
-| `fra` | Frankfurt         |
-| `blr` | Bangalore         |
-| `syd` | Sydney            |
-| `tor` | Toronto (default) |
 
 ---
 
@@ -415,6 +417,27 @@ exec my-daemon --foreground
 - [DigitalOcean App Platform](https://docs.digitalocean.com/products/app-platform/)
 - [AI-Assisted Setup Guide](AI-ASSISTED-SETUP.md)
 - [CLI Cheat Sheet](CHEATSHEET.md)
+
+### Bundled Container Docs
+
+The container includes documentation at `/docs` for AI agents and developers:
+
+- [System Architecture](rootfs/docs/system-architecture.md) - s6-overlay, boot sequence, services, upgrades
+- [Environment Variables](rootfs/docs/environment.md) - How env vars are persisted and loaded
+- [Permissions](rootfs/docs/permissions.md) - File permission management
+- [User Access](rootfs/docs/user-access.md) - Users and the openclaw wrapper
+- [SSH](rootfs/docs/ssh.md) - SSH configuration, local access, key rotation
+
+---
+
+## Contributing
+
+See the [bundled documentation](rootfs/docs/README.md) for architecture details. Key points:
+
+- Changes to `rootfs/` overlay the base container filesystem
+- Use `permissions.yaml` for file permissions, not inline chmod/chown
+- Init scripts run sequentially by number prefix (00-99999)
+- Test locally with `make rebuild` before deploying
 
 ---
 

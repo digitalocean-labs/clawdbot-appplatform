@@ -76,6 +76,31 @@ persist_env_global() {
   done
 }
 
+# Copy all vars from a source prefix to all other prefix directories
+# Usage: broadcast_prefix "PUBLIC_"
+# This makes PUBLIC_ vars available when sourcing any prefix
+broadcast_prefix() {
+  local source_prefix="$1"
+  local source_dir="$ENV_BASE/$source_prefix"
+
+  [[ -d "$source_dir" ]] || return 0
+
+  for target_dir in "$ENV_BASE"/*/; do
+    [[ -d "$target_dir" ]] || continue
+    local target_prefix
+    target_prefix=$(basename "$target_dir")
+
+    # Skip the source prefix itself
+    [[ "$target_prefix" == "$source_prefix" ]] && continue
+
+    # Copy all files from source to target
+    for file in "$source_dir"/*; do
+      [[ -f "$file" ]] || continue
+      cp "$file" "$target_dir/"
+    done
+  done
+}
+
 # Load environment variables from prefix directories
 # Usage: source_env_prefix "TS_" "RESTIC_"
 source_env_prefix() {
@@ -128,6 +153,12 @@ apply_permissions() {
     return 1
   fi
 
+  # Enable globstar for ** recursive matching, nullglob for empty matches
+  local orig_globstar orig_nullglob
+  orig_globstar=$(shopt -p globstar 2>/dev/null || echo "shopt -u globstar")
+  orig_nullglob=$(shopt -p nullglob 2>/dev/null || echo "shopt -u nullglob")
+  shopt -s globstar nullglob
+
   local count
   count=$(yq '.permissions | length' "$config")
 
@@ -153,7 +184,7 @@ apply_permissions() {
     # Check if glob pattern matches anything
     local matched=false
     case "$path" in
-      *\*)
+      *'*'*)
         # shellcheck disable=SC2086
         for _ in $path; do matched=true; break; done
         if [[ "$matched" == "false" ]]; then
@@ -166,7 +197,7 @@ apply_permissions() {
     # Apply mode
     if [[ -n "$mode" ]]; then
       case "$path" in
-        *\*) chmod "$mode" $path 2>/dev/null || true ;;
+        *'*'*) chmod "$mode" $path 2>/dev/null || true ;;
         *) chmod "$mode" "$path" 2>/dev/null || true ;;
       esac
     fi
@@ -178,10 +209,14 @@ apply_permissions() {
       owner="${owner%:}"  # Remove trailing : if no group
       if [[ -n "$owner" ]]; then
         case "$path" in
-          *\*) chown "$owner" $path 2>/dev/null || true ;;
+          *'*'*) chown "$owner" $path 2>/dev/null || true ;;
           *) chown "$owner" "$path" 2>/dev/null || true ;;
         esac
       fi
     fi
   done
+
+  # Restore original shell options
+  eval "$orig_globstar"
+  eval "$orig_nullglob"
 }

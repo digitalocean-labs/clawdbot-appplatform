@@ -37,8 +37,11 @@ chown openclaw:openclaw "$PROFILE"
 # Append environment setup if not already present
 if ! grep -qF "$SOURCE_LINE" "$PROFILE"; then
     cat >> "$PROFILE" <<'EOF'
-# OpenClaw environment setup
 source /etc/s6-overlay/lib/env-utils.sh 2>/dev/null || true
+
+source_env_prefix PUBLIC_ 2>/dev/null || true
+
+# OpenClaw environment setup
 source_env_prefix OPENCLAW_ 2>/dev/null || true
 
 # nvm

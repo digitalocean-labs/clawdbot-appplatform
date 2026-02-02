@@ -13,6 +13,8 @@ jobs:
     outputs:
       configs: ${{ steps.list-configs.outputs.configs }}
       scenarios: ${{ steps.list-scenarios.outputs.scenarios }}
+      registry_name: ${{ steps.create-registry.outputs.registry_name }}
+      image_tag: ${{ steps.image-tag.outputs.image_tag }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,27 +42,59 @@ jobs:
           echo "scenarios=$matrix" >> $GITHUB_OUTPUT
           echo "Found scenarios: $matrix"
 
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+
+      - name: Create DOCR registry
+        id: create-registry
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: |
+          # Use PR number for PRs, "main" for main branch pushes
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            REGISTRY_NAME="openclaw-pr-${{ github.event.pull_request.number }}"
+          else
+            REGISTRY_NAME="openclaw-main"
+          fi
+          echo "Registry: $REGISTRY_NAME"
+
+          # Create registry or verify existing
+          RESULT=$(doctl registry create "$REGISTRY_NAME" --subscription-tier professional --region nyc3 -o json 2>&1) || {
+            # Check if registry exists via get
+            EXISTING=$(doctl registries get "$REGISTRY_NAME" -o json 2>/dev/null | jq -r '.[0].name // empty')
+            if [ "$EXISTING" = "$REGISTRY_NAME" ]; then
+              echo "Using existing registry: $REGISTRY_NAME"
+            else
+              echo "Failed to create registry: $RESULT"
+              exit 1
+            fi
+          }
+          echo "registry_name=$REGISTRY_NAME" >> $GITHUB_OUTPUT
+
+      - name: Log in to DOCR
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: doctl registry login
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Build and push Docker image
+        id: push-image
         uses: docker/build-push-action@v6
         with:
           context: .
-          load: true
-          tags: openclaw-test:latest
+          push: true
+          tags: registry.digitalocean.com/${{ steps.create-registry.outputs.registry_name }}/openclaw-test:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Save Docker image
-        run: docker save openclaw-test:latest -o /tmp/openclaw-test.tar
-
-      - name: Upload image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: /tmp/openclaw-test.tar
-          retention-days: 1
+      - name: Output image tag
+        id: image-tag
+        run: |
+          echo "image_tag=registry.digitalocean.com/${{ steps.create-registry.outputs.registry_name }}/openclaw-test:${{ github.sha }}" >> $GITHUB_OUTPUT
 
   setup:
     needs: build
@@ -85,14 +119,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download image artifact
-        uses: actions/download-artifact@v4
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
         with:
-          name: docker-image
-          path: /tmp
+          token: ${{ secrets.DIGITALOCEAN_TOKEN }}
 
-      - name: Load Docker image
-        run: docker load -i /tmp/openclaw-test.tar
+      - name: Log in to DOCR
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: doctl registry login
+
+      - name: Pull Docker image
+        run: |
+          docker pull ${{ needs.build.outputs.image_tag }}
+          docker tag ${{ needs.build.outputs.image_tag }} openclaw-test:latest
 
       - name: Install s3cmd
         if: matrix.config == 'persistence-enabled'
@@ -125,6 +165,29 @@ jobs:
           echo "SPACES_ENDPOINT=$SPACES_ENDPOINT" >> $GITHUB_OUTPUT
           echo "Created bucket: $BUCKET_NAME"
 
+      - name: Generate test SSH keypair
+        if: contains(matrix.config, 'ssh')
+        id: ssh-key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519_test -C "ci-test@github-actions"
+          echo "SSH_PUBLIC_KEY=$(cat ~/.ssh/id_ed25519_test.pub)" >> $GITHUB_OUTPUT
+          echo "Generated test SSH keypair for external SSH testing"
+
+      - name: Check Tailscale credentials
+        if: matrix.config == 'ssh-tailscale'
+        id: tailscale-check
+        env:
+          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_TOKEN }}
+        run: |
+          if [ -z "$TS_AUTHKEY" ]; then
+            echo "SKIP_TAILSCALE=true" >> $GITHUB_OUTPUT
+            echo "Skipping: TAILSCALE_AUTH_TOKEN secret not configured"
+          else
+            echo "SKIP_TAILSCALE=false" >> $GITHUB_OUTPUT
+            echo "Tailscale credentials available"
+          fi
+
       - name: Copy test configuration
         env:
           RESTIC_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
@@ -132,14 +195,91 @@ jobs:
           RESTIC_SPACES_ENDPOINT: ${{ steps.spaces-bucket.outputs.SPACES_ENDPOINT }}
           RESTIC_SPACES_BUCKET: ${{ steps.spaces-bucket.outputs.BUCKET_NAME }}
           RESTIC_PASSWORD: test-password-${{ github.run_id }}
+          SSH_PUBLIC_KEY: ${{ steps.ssh-key.outputs.SSH_PUBLIC_KEY }}
+          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_TOKEN }}
+          SKIP_TAILSCALE: ${{ steps.tailscale-check.outputs.SKIP_TAILSCALE }}
         run: |
           echo "Testing configuration: ${{ matrix.config }}"
           bash -c 'source tests/lib.sh && switch_config ${{ matrix.config }}'
+
+          # Add s6-overlay debug settings for CI
+          echo "S6_BEHAVIOUR_IF_STAGE2_FAILS=0" >> .env
+          echo "S6_VERBOSITY=2" >> .env
+
+          # Add CI-generated SSH key for SSH configs (for external SSH testing)
+          if [ -n "$SSH_PUBLIC_KEY" ]; then
+            echo "SSH_AUTHORIZED_USERS=$SSH_PUBLIC_KEY" >> .env
+            echo "Added CI SSH key for external SSH testing"
+          fi
+
+          # Add Tailscale auth key for tailscale configs
+          if [ -n "$TS_AUTHKEY" ] && [ "$SKIP_TAILSCALE" != "true" ]; then
+            echo "TS_AUTHKEY=$TS_AUTHKEY" >> .env
+            echo "Added Tailscale auth key"
+          fi
+
+          echo "--- Configuration contents (secrets redacted) ---"
+          sed 's/\(KEY\|SECRET\|PASSWORD\|TOKEN\|AUTHKEY\)=.*/\1=***REDACTED***/g' .env
 
       - name: Start container
         run: |
           docker compose up -d
           sleep 10
+
+      - name: Start Tailscale test sidecar
+        if: matrix.config == 'ssh-tailscale' || matrix.config == 'ssh-tailscale-persistence'
+        env:
+          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_TOKEN }}
+        run: |
+          if [ -z "$TS_AUTHKEY" ]; then
+            echo "Skipping Tailscale sidecar: no auth token"
+            exit 0
+          fi
+
+          # Start Tailscale sidecar container for testing
+          docker run -d --name tailscale-test \
+            --hostname tailscale-test-ci \
+            -e TS_AUTHKEY="$TS_AUTHKEY" \
+            -e TS_STATE_DIR=/var/lib/tailscale \
+            -e TS_USERSPACE=true \
+            -e TS_EXTRA_ARGS="--accept-routes" \
+            --cap-add=NET_ADMIN \
+            tailscale/tailscale:latest
+
+          # Wait for Tailscale to connect
+          echo "Waiting for test sidecar to connect to Tailscale..."
+          for i in {1..60}; do
+            if docker exec tailscale-test tailscale status 2>/dev/null | grep -q "^100\."; then
+              echo "✓ Test sidecar connected to Tailscale"
+              docker exec tailscale-test tailscale status
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "error: Tailscale sidecar failed to connect"
+              docker logs tailscale-test
+              exit 1
+            fi
+            sleep 2
+          done
+
+          # Install SSH client in sidecar for testing
+          docker exec tailscale-test apk add --no-cache openssh-client
+
+          # Copy CI test key to sidecar
+          docker cp ~/.ssh/id_ed25519_test tailscale-test:/tmp/
+          docker exec tailscale-test chmod 600 /tmp/id_ed25519_test
+
+      - name: Dump container status
+        if: always()
+        run: docker ps -a --filter name=${{ matrix.config }}
+
+      - name: Dump container logs
+        if: always()
+        run: docker logs ${{ matrix.config }} 2>&1 || true
+
+      - name: Dump process list
+        if: always()
+        run: docker exec ${{ matrix.config }} ps aux || echo "Container not running"
 
       - name: Verify container is running
         run: |
@@ -149,9 +289,15 @@ jobs:
           fi
 
       - name: Run ${{ matrix.script }}
+        id: run-test
         env:
           DO_SPACES_ACCESS_KEY_ID: ${{ secrets.DO_SPACES_ACCESS_KEY_ID }}
           DO_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
+          SKIP_TAILSCALE: ${{ steps.tailscale-check.outputs.SKIP_TAILSCALE }}
+          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_TOKEN }}
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          CI_REGISTRY_NAME: ${{ needs.build.outputs.registry_name }}
+          CI_IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
         run: |
           echo "Running tests/${{ matrix.config }}/${{ matrix.script }}"
           ./tests/${{ matrix.config }}/${{ matrix.script }} ${{ matrix.config }}
@@ -189,6 +335,50 @@ jobs:
                 --host="$SPACES_ENDPOINT" \
                 --host-bucket="%(bucket)s.$SPACES_ENDPOINT" \
                 rb --recursive "s3://$BUCKET_NAME" || true
+
+      - name: Cleanup Tailscale sidecar
+        if: always() && (matrix.config == 'ssh-tailscale' || matrix.config == 'ssh-tailscale-persistence')
+        run: |
+          docker stop tailscale-test 2>/dev/null || true
+          docker rm tailscale-test 2>/dev/null || true
+
+      - name: Dump App Platform state
+        if: always() && steps.run-test.outputs.app_id != ''
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: |
+          APP_ID="${{ steps.run-test.outputs.app_id }}"
+          echo "=== Dumping app state for debugging ==="
+          echo "App ID: $APP_ID"
+
+          APP_JSON=$(doctl apps get "$APP_ID" -o json 2>/dev/null) || true
+          COMPONENT=$(echo "$APP_JSON" | jq -r '.[0].spec.workers[0].name // empty')
+
+          echo ""
+          echo "=== App JSON ==="
+          echo "$APP_JSON" | jq '.' || true
+
+          echo ""
+          echo "=== Build logs ==="
+          doctl apps logs "$APP_ID" --type=build 2>/dev/null | tail -100 || true
+
+          echo ""
+          echo "=== Run logs ==="
+          doctl apps logs "$APP_ID" --type=run 2>/dev/null | tail -100 || true
+
+          echo ""
+          echo "=== Process list ==="
+          if [ -n "$COMPONENT" ]; then
+            echo "ps aux" | timeout 30 doctl apps console "$APP_ID" "$COMPONENT" 2>/dev/null || echo "Failed to get process list"
+          fi
+
+      - name: Cleanup App Platform app
+        if: always() && steps.run-test.outputs.app_id != ''
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: |
+          echo "Cleaning up App Platform app: ${{ steps.run-test.outputs.app_id }}"
+          doctl apps delete "${{ steps.run-test.outputs.app_id }}" --force || echo "App already deleted or not found (404 is OK)"
 
       - name: Cleanup
         if: always()

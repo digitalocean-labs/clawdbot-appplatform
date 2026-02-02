@@ -1,0 +1,32 @@
+name: openclaw
+region: tor
+workers:
+  - dockerfile_path: /Dockerfile
+    envs:
+      - key: TS_AUTHKEY
+        scope: RUN_TIME
+        type: SECRET
+        value: XXX
+      - key: STABLE_HOSTNAME
+        scope: RUN_TIME
+        value: apps-openclaw
+      - key: TAILSCALE_ENABLE
+        scope: RUN_TIME
+        value: "true"
+      - key: OPENCLAW_GATEWAY_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+        value: XXX
+      - key: SSH_ENABLE
+        scope: RUN_TIME
+        value: "true"
+      - key: SSH_ALLOW_LOCAL
+        scope: RUN_TIME
+        value: "true"
+    git:
+      branch: main
+      repo_clone_url: https://github.com/digitalocean-labs/openclaw-appplatform.git
+    instance_count: 1
+    instance_size_slug: apps-d-2vcpu-4gb
+    name: openclaw
+    source_dir: /

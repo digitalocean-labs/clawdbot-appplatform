@@ -3,19 +3,34 @@
 # Usage: openclaw <command> [args...]
 # Example: openclaw channels login
 #          openclaw gateway health --url ws://127.0.0.1:18789
+#
+# Environment:
+#   PUBLIC_SSH_LOCALACCESS=true  - Use local SSH by default instead of sudo/su
 
-# Source environment utilities
-source /etc/s6-overlay/lib/env-utils.sh
-source_env_prefix OPENCLAW_
+# Source environment utilities if available
+if [ -f /etc/s6-overlay/lib/env-utils.sh ]; then
+  source /etc/s6-overlay/lib/env-utils.sh
+  source_env_prefix OPENCLAW_
+  source_env_prefix PUBLIC_
+fi
 
-# Run directly if already openclaw user, otherwise switch user
+# Run directly if already openclaw user
 if [ "$(id -un)" = "openclaw" ]; then
   export NVM_DIR="$HOME/.nvm"
   [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
   export PNPM_HOME="$HOME/.local/share/pnpm"
   export PATH="$PNPM_HOME:$PATH"
   exec "$PNPM_HOME/openclaw" "$@"
-elif [ "$(id -u)" = "0" ]; then
+fi
+
+# Use local SSH if enabled by default, or if sudo isn't available
+if [ "${PUBLIC_SSH_LOCALACCESS:-true}" = "true" ] || ! command -v sudo &>/dev/null; then
+  export MOTD_SKIP=1
+  exec ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no openclaw@localhost "openclaw$(printf ' %q' "$@")"
+fi
+
+# Switch user based on current privileges
+if [ "$(id -u)" = "0" ]; then
   exec su - openclaw -c "openclaw$(printf ' %q' "$@")"
 else
   exec sudo -u openclaw bash -l -c "openclaw$(printf ' %q' "$@")"

@@ -11,5 +11,9 @@ persist_env_global STABLE_HOSTNAME
 # Organize all by prefix into subdirectories
 persist_env_all_prefixes
 
+# Broadcast PUBLIC_ vars to all other prefix directories
+# This makes PUBLIC_ vars available when sourcing any prefix
+broadcast_prefix PUBLIC_
+
 # Apply runtime permissions
 apply_permissions

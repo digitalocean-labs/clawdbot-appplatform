@@ -1,15 +1,12 @@
 #!/bin/bash
 # Unified backup script using restic
-# Reads configuration from RESTIC_BACKUP_CONFIG_FILE (default: /etc/digitalocean/backup.yaml)
+# Reads configuration from RESTIC_BACKUP_RESTIC_BACKUP_CONFIG_FILE (default: /etc/digitalocean/backup.yaml)
 
 set -e
 
-# Load RESTIC_ env vars
-for f in /run/s6/container_environment/RESTIC_/*; do
-  [ -f "$f" ] && export "$(basename "$f")"="$(cat "$f")"
-done
+source /etc/s6-overlay/lib/env-utils.sh
+source_env_prefix RESTIC_
 
-CONFIG_FILE="${RESTIC_BACKUP_CONFIG_FILE:-/etc/digitalocean/backup.yaml}"
 QUIET=""
 
 # Parse arguments
@@ -42,8 +39,8 @@ if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
 fi
 
 # Check if config exists
-if [ ! -f "$CONFIG_FILE" ]; then
-  log "Config file not found: $CONFIG_FILE"
+if [ ! -f "$RESTIC_BACKUP_CONFIG_FILE" ]; then
+  log "Config file not found: $RESTIC_BACKUP_CONFIG_FILE"
   exit 1
 fi
 
@@ -53,7 +50,7 @@ mkdir -p "$(dirname "$DPKG_SELECTIONS")"
 dpkg --get-selections > "$DPKG_SELECTIONS" 2>/dev/null || true
 
 # Get number of paths to backup
-PATH_COUNT=$(yq -r '.paths | length' "$CONFIG_FILE")
+PATH_COUNT=$(yq -r '.paths | length' "$RESTIC_BACKUP_CONFIG_FILE")
 
 if [ "$PATH_COUNT" -eq 0 ]; then
   log "No paths configured for backup"
@@ -64,7 +61,7 @@ log "Starting backup of $PATH_COUNT paths..."
 
 # Build restic backup command for each path
 for i in $(seq 0 $((PATH_COUNT - 1))); do
-  BACKUP_PATH=$(yq -r ".paths[$i].path" "$CONFIG_FILE")
+  BACKUP_PATH=$(yq -r ".paths[$i].path" "$RESTIC_BACKUP_CONFIG_FILE")
 
   # Skip if path doesn't exist
   if [ ! -e "$BACKUP_PATH" ]; then
@@ -74,10 +71,10 @@ for i in $(seq 0 $((PATH_COUNT - 1))); do
 
   # Build exclude arguments
   EXCLUDE_ARGS=""
-  EXCLUDE_COUNT=$(yq -r ".paths[$i].exclude | length // 0" "$CONFIG_FILE")
+  EXCLUDE_COUNT=$(yq -r ".paths[$i].exclude | length // 0" "$RESTIC_BACKUP_CONFIG_FILE")
 
   for j in $(seq 0 $((EXCLUDE_COUNT - 1))); do
-    PATTERN=$(yq -r ".paths[$i].exclude[$j]" "$CONFIG_FILE")
+    PATTERN=$(yq -r ".paths[$i].exclude[$j]" "$RESTIC_BACKUP_CONFIG_FILE")
     EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$PATTERN"
   done
 

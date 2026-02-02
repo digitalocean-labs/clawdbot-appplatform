@@ -131,7 +131,7 @@ wait_for_service() {
 wait_for_process() {
     local container=$1
     local process=$2
-    local max_attempts=${3:-5}
+    local max_attempts=${3:-30}
     local attempt=1
 
     while [ $attempt -le $max_attempts ]; do
@@ -142,7 +142,7 @@ wait_for_process() {
         if [ $attempt -eq $max_attempts ]; then
             return 1
         fi
-        sleep 0.5
+        sleep 1
         attempt=$((attempt + 1))
     done
     return 1
@@ -234,4 +234,151 @@ assert_service_down() {
     fi
     echo "✓ $service service down (as expected)"
     return 0
+}
+
+# Test SSH connection from one user to another within the container
+# Usage: test_ssh_connection <container-name> <from-user> <to-user> [command]
+# Example: test_ssh_connection mycontainer ubuntu root "whoami"
+test_ssh_connection() {
+    local container=$1
+    local from_user=$2
+    local to_user=$3
+    local command=${4:-whoami}
+
+    echo "Testing SSH: $from_user -> $to_user@localhost..."
+
+    # Build the SSH command with strict options to avoid prompts
+    local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=5"
+
+    # Run SSH command as from_user
+    local result
+    if result=$(docker exec "$container" su - "$from_user" -c "ssh $ssh_opts $to_user@localhost '$command'" 2>&1); then
+        echo "✓ SSH $from_user -> $to_user succeeded"
+        echo "  output: $result"
+        return 0
+    else
+        echo "error: SSH $from_user -> $to_user failed"
+        echo "  output: $result"
+        return 1
+    fi
+}
+
+# Assert SSH connection works
+# Usage: assert_ssh_works <container-name> <from-user> <to-user>
+assert_ssh_works() {
+    local container=$1
+    local from_user=$2
+    local to_user=$3
+
+    if ! test_ssh_connection "$container" "$from_user" "$to_user" "whoami"; then
+        return 1
+    fi
+
+    # Verify the whoami output matches expected user
+    local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=5"
+    local result
+    result=$(docker exec "$container" su - "$from_user" -c "ssh $ssh_opts $to_user@localhost 'whoami'" 2>/dev/null)
+
+    if [ "$result" = "$to_user" ]; then
+        echo "✓ SSH identity verified: logged in as $to_user"
+        return 0
+    else
+        echo "error: Expected whoami=$to_user, got: $result"
+        return 1
+    fi
+}
+
+# Assert SSH connection is denied
+# Usage: assert_ssh_denied <container-name> <from-user> <to-user>
+assert_ssh_denied() {
+    local container=$1
+    local from_user=$2
+    local to_user=$3
+
+    echo "Testing SSH should fail: $from_user -> $to_user@localhost..."
+
+    local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=5"
+
+    if docker exec "$container" su - "$from_user" -c "ssh $ssh_opts $to_user@localhost 'whoami'" 2>/dev/null; then
+        echo "error: SSH $from_user -> $to_user succeeded but should have been denied"
+        return 1
+    else
+        echo "✓ SSH $from_user -> $to_user denied (as expected)"
+        return 0
+    fi
+}
+
+# Test external SSH connection (from CI runner to container)
+# Usage: test_external_ssh <host> <port> <user> <key-file> [command]
+# Example: test_external_ssh localhost 2222 ubuntu ~/.ssh/id_ed25519_test "whoami"
+test_external_ssh() {
+    local host=$1
+    local port=$2
+    local user=$3
+    local key_file=$4
+    local command=${5:-whoami}
+
+    echo "Testing external SSH: $user@$host:$port..."
+
+    local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 -i $key_file -p $port"
+
+    local result
+    if result=$(ssh $ssh_opts "$user@$host" "$command" 2>&1); then
+        echo "✓ External SSH to $user@$host:$port succeeded"
+        echo "  output: $result"
+        return 0
+    else
+        echo "error: External SSH to $user@$host:$port failed"
+        echo "  output: $result"
+        return 1
+    fi
+}
+
+# Assert external SSH connection works and returns expected user
+# Usage: assert_external_ssh_works <host> <port> <user> <key-file>
+assert_external_ssh_works() {
+    local host=$1
+    local port=$2
+    local user=$3
+    local key_file=$4
+
+    if ! test_external_ssh "$host" "$port" "$user" "$key_file" "whoami"; then
+        return 1
+    fi
+
+    local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 -i $key_file -p $port"
+    local result
+    result=$(ssh $ssh_opts "$user@$host" "whoami" 2>/dev/null)
+
+    if [ "$result" = "$user" ]; then
+        echo "✓ External SSH identity verified: logged in as $user"
+        return 0
+    else
+        echo "error: Expected whoami=$user, got: $result"
+        return 1
+    fi
+}
+
+# Wait for SSH port to be reachable externally
+# Usage: wait_for_ssh_port <host> <port> [max-attempts]
+wait_for_ssh_port() {
+    local host=$1
+    local port=$2
+    local max_attempts=${3:-30}
+    local attempt=1
+
+    echo "Waiting for SSH port $host:$port to be reachable..."
+
+    while [ $attempt -le $max_attempts ]; do
+        if nc -z "$host" "$port" 2>/dev/null || bash -c "echo > /dev/tcp/$host/$port" 2>/dev/null; then
+            echo "✓ SSH port $host:$port reachable"
+            return 0
+        fi
+        echo "  Attempt $attempt/$max_attempts..."
+        sleep 1
+        attempt=$((attempt + 1))
+    done
+
+    echo "error: SSH port $host:$port not reachable after $max_attempts attempts"
+    return 1
 }

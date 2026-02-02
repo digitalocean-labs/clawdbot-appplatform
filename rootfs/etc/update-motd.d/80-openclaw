@@ -1,10 +1,21 @@
 #!/bin/bash
+# Skip if MOTD_SKIP is set (prevents recursion from openclaw wrapper)
+[ -n "$MOTD_SKIP" ] && exit 0
+
 source /etc/update-motd.d/lib.sh
 
 echo -e "  🦞 ${BOLD}OpenClaw${NC}"
 echo -e "  ${DIM}─────────────────────────────────────${NC}"
 
-HEALTH=$(openclaw health --json 2>/dev/null)
+# Get health status - call directly if openclaw user, otherwise try sudo then su (non-login shells to avoid MOTD recursion)
+OPENCLAW_BIN="/home/openclaw/.local/share/pnpm/openclaw"
+if [ "$(id -un)" = "openclaw" ]; then
+  HEALTH=$(timeout 5 "$OPENCLAW_BIN" health --json 2>/dev/null)
+elif command -v sudo >/dev/null 2>&1; then
+  HEALTH=$(timeout 5 sudo -n -u openclaw "$OPENCLAW_BIN" health --json 2>/dev/null)
+else
+  HEALTH=$(timeout 5 su openclaw -s /bin/bash -c "$OPENCLAW_BIN health --json" 2>/dev/null)
+fi
 if [ -n "$HEALTH" ]; then
   OK=$(echo "$HEALTH" | jq -r '.ok')
   if [ "$OK" = "true" ]; then

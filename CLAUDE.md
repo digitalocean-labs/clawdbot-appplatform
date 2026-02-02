@@ -35,6 +35,7 @@ The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) f
 - `10-restore-state` - Restores application state from Restic snapshots
 - `11-reinstall-brews` - Reinstalls Homebrew packages from backup (if Homebrew installed)
 - `12-ssh-import-ids` - Imports SSH keys from GitHub (if GITHUB_USERNAME set)
+- `13-setup-ssh-local` - Configures SSHD (if SSH_ENABLE=true and SSH_ALLOW_LOCAL=true)
 - `20-setup-openclaw` - Builds openclaw.json from environment variables
 - `99999-apply-permissions` - Applies final file permissions
 
@@ -48,6 +49,16 @@ The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) f
 - `crond/` - Cron daemon for scheduled tasks
 
 Users can add custom init scripts (prefix with `30-` or higher) and custom services.
+
+### Init Script Guidelines
+
+- Use `permissions.yaml` for file permissions - never `chmod`/`chown` in init scripts
+- Extract repeated logic into functions (e.g., `cleanup()` for enable/disable patterns)
+- sshd_config.d uses first-match for directives - order matters
+
+## Cron
+
+- Files in `/etc/cron.d/` must be 0644 (not executable), owned by root:root
 
 ## Networking
 
