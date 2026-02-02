@@ -98,7 +98,7 @@ jobs:
         if: contains(matrix.script, 'app-platform')
         uses: digitalocean/action-doctl@v2
         with:
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          token: ${{ secrets.DIGITALOCEAN_TOKEN }}
 
       - name: Install s3cmd
         if: matrix.config == 'persistence-enabled'
@@ -261,7 +261,7 @@ jobs:
           DO_SPACES_SECRET_ACCESS_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY }}
           SKIP_TAILSCALE: ${{ steps.tailscale-check.outputs.SKIP_TAILSCALE }}
           TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_TOKEN }}
-          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
         run: |
           echo "Running tests/${{ matrix.config }}/${{ matrix.script }}"
           ./tests/${{ matrix.config }}/${{ matrix.script }} ${{ matrix.config }}
@@ -309,7 +309,7 @@ jobs:
       - name: Cleanup App Platform app
         if: always() && steps.run-test.outputs.app_id != ''
         env:
-          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
         run: |
           echo "Cleaning up App Platform app: ${{ steps.run-test.outputs.app_id }}"
           doctl apps delete "${{ steps.run-test.outputs.app_id }}" --force || echo "App already deleted or not found (404 is OK)"
@@ -317,7 +317,7 @@ jobs:
       - name: Cleanup DOCR registry
         if: always() && steps.run-test.outputs.registry_name != ''
         env:
-          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
         run: |
           echo "Cleaning up DOCR registry: ${{ steps.run-test.outputs.registry_name }}"
           doctl registry delete --force || echo "Registry already deleted or not found (404 is OK)"
