@@ -211,15 +211,15 @@ for target_user in ubuntu root; do
     fi
 done
 
-# Test SSH to openclaw should fail
+# Test SSH to openclaw should work (openclaw is in localaccess group)
 echo ""
-echo "Testing: SSH to openclaw@localhost should be denied..."
-SSH_OUTPUT=$(run_ts_ssh ubuntu "ssh $SSH_OPTS openclaw@localhost whoami 2>&1 || echo SSH_DENIED") || SSH_OUTPUT="SSH_DENIED"
+echo "Testing: SSH to openclaw@localhost..."
+SSH_OUTPUT=$(run_ts_ssh ubuntu "ssh $SSH_OPTS openclaw@localhost whoami 2>&1") || SSH_OUTPUT="SSH_FAILED"
 
-if echo "$SSH_OUTPUT" | grep -qE "SSH_DENIED|Permission denied|not allowed"; then
-    echo "✓ SSH to openclaw@localhost correctly denied"
+if echo "$SSH_OUTPUT" | grep -q "openclaw"; then
+    echo "✓ SSH to openclaw@localhost works"
 else
-    echo "error: SSH to openclaw@localhost should have been denied"
+    echo "error: SSH to openclaw@localhost failed"
     echo "Got: $SSH_OUTPUT"
     exit 1
 fi

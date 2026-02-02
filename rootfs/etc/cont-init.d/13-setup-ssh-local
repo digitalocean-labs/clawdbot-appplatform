@@ -58,7 +58,7 @@ cleanup_local_access() {
   rm -f /etc/ssh/ssh_config.d/00-localssh.conf
 
   # Remove local access keys from user authorized_keys files
-  for user in ubuntu root; do
+  for user in ubuntu root openclaw; do
     HOME_DIR=$(getent passwd "$user" | cut -d: -f6)
     if [ -n "$HOME_DIR" ] && [ -f "$HOME_DIR/.ssh/authorized_keys" ]; then
       sed -i '/^# BEGIN LOCAL ACCESS KEYS$/,/^# END LOCAL ACCESS KEYS$/d' "$HOME_DIR/.ssh/authorized_keys"
@@ -101,8 +101,8 @@ if ! getent group "$GROUP" >/dev/null; then
   echo "[ssh-local] Created group: $GROUP"
 fi
 
-# Add ubuntu and root to the group
-for user in ubuntu root; do
+# Add ubuntu, root, and openclaw to the group
+for user in ubuntu root openclaw; do
   if id "$user" &>/dev/null; then
     usermod -aG "$GROUP" "$user"
     echo "[ssh-local] Added $user to $GROUP group"
@@ -112,6 +112,7 @@ done
 # Create .ssh directories
 mkdir -p /root/.ssh
 mkdir -p /home/ubuntu/.ssh
+mkdir -p /home/openclaw/.ssh
 
 # Generate keys for all group members and populate authorized_keys
 /usr/local/bin/ssh-rotate-local-key
