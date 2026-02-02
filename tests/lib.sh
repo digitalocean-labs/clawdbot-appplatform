@@ -131,7 +131,7 @@ wait_for_service() {
 wait_for_process() {
     local container=$1
     local process=$2
-    local max_attempts=${3:-5}
+    local max_attempts=${3:-30}
     local attempt=1
 
     while [ $attempt -le $max_attempts ]; do
@@ -142,7 +142,7 @@ wait_for_process() {
         if [ $attempt -eq $max_attempts ]; then
             return 1
         fi
-        sleep 0.5
+        sleep 1
         attempt=$((attempt + 1))
     done
     return 1

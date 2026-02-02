@@ -12,6 +12,9 @@ echo "Testing external SSH access (container: $CONTAINER)..."
 # Container should be running
 docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
 
+# Wait for sshd to be running
+wait_for_process "$CONTAINER" "sshd" || { echo "error: sshd not running"; exit 1; }
+
 CI_KEY="$HOME/.ssh/id_ed25519_test"
 if [ ! -f "$CI_KEY" ]; then
     echo "SKIP: CI test key not found, skipping external SSH tests"

@@ -12,6 +12,9 @@ echo "Testing local SSH access (container: $CONTAINER)..."
 # Container should be running
 docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
 
+# Wait for sshd to be running
+wait_for_process "$CONTAINER" "sshd" || { echo "error: sshd not running"; exit 1; }
+
 # Test all user combinations
 assert_ssh_works "$CONTAINER" ubuntu ubuntu || exit 1
 assert_ssh_works "$CONTAINER" ubuntu root || exit 1

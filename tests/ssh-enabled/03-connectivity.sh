@@ -12,6 +12,9 @@ echo "Testing SSH connectivity (container: $CONTAINER)..."
 # Container should be running
 docker exec "$CONTAINER" true || { echo "error: container not responsive"; exit 1; }
 
+# Wait for sshd to be running
+wait_for_process "$CONTAINER" "sshd" || { echo "error: sshd not running"; exit 1; }
+
 # Create temporary test key
 TEST_KEY_DIR=$(mktemp -d)
 TEST_KEY="$TEST_KEY_DIR/test_key"
