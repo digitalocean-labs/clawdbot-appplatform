@@ -19,11 +19,6 @@ if [ -n "$DIGITALOCEAN_TOKEN" ]; then
     export DIGITALOCEAN_ACCESS_TOKEN="$DIGITALOCEAN_TOKEN"
 fi
 
-# Verify doctl is authenticated
-echo "Checking doctl auth..."
-doctl account get
-echo "✓ doctl authenticated"
-
 if [ -z "$TS_AUTHKEY" ]; then
     echo "error: TS_AUTHKEY not set (required for app deployment)"
     exit 1
