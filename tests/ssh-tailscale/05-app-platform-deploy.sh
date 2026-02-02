@@ -132,7 +132,7 @@ fi
 
 # Wait for app to be fully deployed (ACTIVE status)
 echo "Waiting for app deployment (this may take several minutes)..."
-DEPLOY_TIMEOUT=300  # 5 minutes
+DEPLOY_TIMEOUT=1200  # 20 minutes
 DEPLOY_START=$(date +%s)
 
 while true; do
