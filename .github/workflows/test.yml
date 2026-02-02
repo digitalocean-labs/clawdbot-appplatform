@@ -60,12 +60,20 @@ jobs:
           fi
           echo "Registry: $REGISTRY_NAME"
 
-          # Create registry if it doesn't exist
-          if ! doctl registry get "$REGISTRY_NAME" &>/dev/null; then
-            echo "Creating DOCR registry: $REGISTRY_NAME"
-            doctl registry create "$REGISTRY_NAME" --subscription-tier professional --region nyc3
-          else
+          # Check if registry exists
+          EXISTING=$(doctl registry get --format Name --no-header 2>/dev/null || echo "")
+          if [ "$EXISTING" = "$REGISTRY_NAME" ]; then
             echo "Using existing registry: $REGISTRY_NAME"
+          else
+            echo "Creating DOCR registry: $REGISTRY_NAME"
+            doctl registry create "$REGISTRY_NAME" --subscription-tier professional --region nyc3 || {
+              # 409 means it already exists, which is fine
+              if doctl registry get --format Name --no-header 2>/dev/null | grep -q "$REGISTRY_NAME"; then
+                echo "Registry already exists (409), continuing..."
+              else
+                exit 1
+              fi
+            }
           fi
           echo "registry_name=$REGISTRY_NAME" >> $GITHUB_OUTPUT
 
