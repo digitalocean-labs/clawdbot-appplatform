@@ -20,7 +20,7 @@ source_env_prefix SSH_
 GROUP="localaccess"
 
 cleanup() {
-  persist_env_var PUBLIC PUBLIC_SSH_LOCALACCESS=false
+  persist_env_var _PUBLIC PUBLIC_SSH_LOCALACCESS=false
 
   rm -f /etc/ssh/sshd_config.d/local-access.conf
   rm -f /etc/ssh/ssh_config.d/00-localssh.conf
@@ -51,7 +51,7 @@ if [ "${SSH_ALLOW_LOCAL:-true}" != "true" ]; then
 fi
 
 echo "[ssh-local] Setting up local SSH access..."
-persist_env_var PUBLIC PUBLIC_SSH_LOCALACCESS=true
+persist_env_var _PUBLIC PUBLIC_SSH_LOCALACCESS=true
 # Create localaccess group if it doesn't exist
 if ! getent group "$GROUP" >/dev/null; then
   groupadd "$GROUP"
@@ -72,33 +72,6 @@ mkdir -p /home/ubuntu/.ssh
 
 # Generate keys for all group members and populate authorized_keys
 /usr/local/bin/ssh-rotate-local-key
-
-# Configure sshd for local access
-mkdir -p /etc/ssh/sshd_config.d
-
-# Configure sshd (local access keys are in each user's authorized_keys)
-cat > /etc/ssh/sshd_config.d/00-localssh.conf << 'EOF'
-# OpenClaw SSH configuration
-
-# Disable root login via SSH (overridden for localhost below)
-PermitRootLogin no
-
-# Disable password authentication - key only
-PasswordAuthentication no
-PermitEmptyPasswords no
-ChallengeResponseAuthentication no
-KbdInteractiveAuthentication no
-
-# Enable public key authentication
-PubkeyAuthentication yes
-AuthorizedKeysFile .ssh/authorized_keys
-
-# Use PAM for authentication
-UsePAM yes
-
-# Accept MOTD_SKIP to prevent MOTD recursion from openclaw wrapper
-AcceptEnv MOTD_SKIP
-EOF
 
 # Allow root login from localhost only
 cat > /etc/ssh/sshd_config.d/local-access.conf << 'EOF'
