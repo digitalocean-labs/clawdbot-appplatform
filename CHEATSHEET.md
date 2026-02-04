@@ -92,7 +92,7 @@ openclaw message send --channel discord --target channel:123456 --message "Hello
 
 ```bash
 /command/s6-svc -r /run/service/openclaw           # Restart openclaw
-/command/s6-svc -r /run/service/ngrok             # Restart ngrok
+
 /command/s6-svc -r /run/service/tailscale         # Restart tailscale
 /command/s6-svc -d /run/service/openclaw           # Stop openclaw
 /command/s6-svc -u /run/service/openclaw           # Start openclaw
@@ -144,7 +144,7 @@ echo "--- Config ---" && \
 cat /data/.openclaw/openclaw.json | jq .
 
 # Check what's running
-ps aux | grep -E "(openclaw|ngrok|tailscale)"
+ps aux | grep -E "(openclaw|tailscale)"
 
 # Disk usage
 df -h /data
